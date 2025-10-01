@@ -61,12 +61,12 @@ Singleton {
 
             let str = "";
             if (days > 0)
-                str += `${days} day${days === 1 ? "" : "s"}`;
+                str += `${days}d `;
             if (hours > 0)
-                str += `${str ? ", " : ""}${hours} hour${hours === 1 ? "" : "s"}`;
+                str += `${hours}h `;
             if (minutes > 0 || !str)
-                str += `${str ? ", " : ""}${minutes} minute${minutes === 1 ? "" : "s"}`;
-            root.uptime = str;
+                str += `${minutes}m`;
+            root.uptime = str.trim();
         }
     }
 }
