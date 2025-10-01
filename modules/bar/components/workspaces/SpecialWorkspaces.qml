@@ -100,7 +100,7 @@ Item {
         }
 
         preferredHighlightBegin: 0
-        preferredHighlightEnd: height
+        preferredHighlightEnd: width
         highlightRangeMode: ListView.StrictlyEnforceRange
 
         highlightFollowsCurrentItem: false

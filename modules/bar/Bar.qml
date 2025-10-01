@@ -41,7 +41,7 @@ RowLayout {
         }
 
         const id = ch.id;
-        const top = ch.x;
+        const left = ch.x;
         const item = ch.item;
         const itemWidth = item.implicitWidth;
 

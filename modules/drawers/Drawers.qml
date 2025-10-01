@@ -56,7 +56,7 @@ Variants {
 
             mask: Region {
                 x: Config.border.thickness + win.dragMaskPadding
-                y: bar.implicitWidth + win.dragMaskPadding
+                y: bar.implicitHeight + win.dragMaskPadding
                 width: win.width - Config.border.thickness * 2 - win.dragMaskPadding * 2
                 height: win.height - bar.implicitHeight - Config.border.thickness - win.dragMaskPadding * 2
                 intersection: Intersection.Xor
@@ -78,7 +78,7 @@ Variants {
                     required property Item modelData
 
                     x: modelData.x + Config.border.thickness
-                    y: modelData.y + bar.implicitWidth
+                    y: modelData.y + bar.implicitHeight
                     width: modelData.width
                     height: modelData.height
                     intersection: Intersection.Subtract
