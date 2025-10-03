@@ -1,9 +1,11 @@
 #pragma once
 
-#include <qhash.h>
-#include <qobject.h>
+#include <QHash>
+#include <QList>
+#include <QObject>
+#include <QPointer>
+#include <QTimer>
 #include <qqmlintegration.h>
-#include <qtimer.h>
 
 namespace caelestia {
 
@@ -12,7 +14,7 @@ class AppEntry : public QObject {
     QML_ELEMENT
     QML_UNCREATABLE("AppEntry instances can only be retrieved from an AppDb")
 
-    // The actual DesktopEntry, but we don't have access to the type so it's a QObject
+    // We expose the underlying object for read-only QML use.
     Q_PROPERTY(QObject* entry READ entry CONSTANT)
 
     Q_PROPERTY(quint32 frequency READ frequency NOTIFY frequencyChanged)
@@ -28,7 +30,7 @@ class AppEntry : public QObject {
 public:
     explicit AppEntry(QObject* entry, quint32 frequency, QObject* parent = nullptr);
 
-    [[nodiscard]] QObject* entry() const;
+    [[nodiscard]] QObject* entry() const { return m_entry; }
 
     [[nodiscard]] quint32 frequency() const;
     void setFrequency(quint32 frequency);
@@ -54,8 +56,10 @@ signals:
     void keywordsChanged();
 
 private:
-    QObject* m_entry;
-    quint32 m_frequency;
+    void mirrorNotifySignals(); // hook DesktopEntry notifies to our notifies
+
+    QPointer<QObject> m_entry; // auto-nulls on deletion
+    quint32 m_frequency = 0;
 };
 
 class AppDb : public QObject {
@@ -88,7 +92,7 @@ signals:
     void appsChanged();
 
 private:
-    QTimer* m_timer;
+    QTimer* m_timer = nullptr;
 
     const QString m_uuid;
     QString m_path;

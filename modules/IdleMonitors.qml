@@ -5,7 +5,6 @@ import qs.config
 import qs.services
 import Caelestia.Internal
 import Quickshell
-import Quickshell.Wayland
 
 Scope {
     id: root
@@ -42,7 +41,7 @@ Scope {
         IdleMonitor {
             required property var modelData
 
-            enabled: root.enabled && (modelData.enabled ?? true)
+            enabled: root.enabled && (modelData.enabled ?? true) && (!(modelData.respectInhibitors ?? true) || !IdleInhibitor.enabled)
             timeout: modelData.timeout
             respectInhibitors: modelData.respectInhibitors ?? true
             onIsIdleChanged: root.handleIdleAction(isIdle ? modelData.idleAction : modelData.returnAction)

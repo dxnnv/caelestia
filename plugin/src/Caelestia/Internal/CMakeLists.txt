@@ -5,6 +5,8 @@ qml_module(caelestia-internal
         circularindicatormanager.hpp circularindicatormanager.cpp
         hyprdevices.hpp hyprdevices.cpp
         hyprextras.hpp hyprextras.cpp
+        idleinhibitor.hpp idleinhibitor.cpp
+        idlemonitor.hpp idlemonitor.cpp
         logindmanager.hpp logindmanager.cpp
     LIBRARIES
         Qt::Gui

@@ -2,11 +2,12 @@ pragma Singleton
 
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
+import Caelestia.Internal as Internal
 
 Singleton {
     id: root
 
+    property var window: defaultWindow
     property alias enabled: props.enabled
     readonly property alias enabledSince: props.enabledSince
 
@@ -17,21 +18,24 @@ Singleton {
 
     PersistentProperties {
         id: props
-
         property bool enabled
         property date enabledSince
-
         reloadableId: "idleInhibitor"
     }
 
-    IdleInhibitor {
-        enabled: props.enabled
-        window: PanelWindow {
-            implicitWidth: 0
-            implicitHeight: 0
-            color: "transparent"
-            mask: Region {}
-        }
+    PanelWindow {
+        id: defaultWindow
+
+        implicitWidth: 0
+        implicitHeight: 0
+        visible: false
+        color: "transparent"
+        mask: Region {}
+    }
+
+    Internal.IdleInhibitor {
+        enabled: props.enabled && !!root.window
+        window: root.window
     }
 
     IpcHandler {
