@@ -1,4 +1,4 @@
-import argparse
+from argparse import ArgumentParser, Namespace
 
 from caelestia.subcommands import clipboard, emoji, record, resizer, scheme, screenshot, shell, toggle, wallpaper
 from caelestia.utils.paths import wallpapers_dir
@@ -6,8 +6,8 @@ from caelestia.utils.scheme import get_scheme_names, scheme_variants
 from caelestia.utils.wallpaper import get_wallpaper
 
 
-def parse_args() -> (argparse.ArgumentParser, argparse.Namespace):
-    parser = argparse.ArgumentParser(prog="caelestia", description="Main control script for the Caelestia dotfiles")
+def parse_args() -> tuple[ArgumentParser, Namespace]:
+    parser = ArgumentParser(prog="caelestia", description="Main control script for the Caelestia dotfiles")
     parser.add_argument("-v", "--version", action="store_true", help="print the current version")
 
     # Add subcommand parsers
@@ -15,7 +15,7 @@ def parse_args() -> (argparse.ArgumentParser, argparse.Namespace):
         title="subcommands", description="valid subcommands", metavar="COMMAND", help="the subcommand to run"
     )
 
-    # Create parser for shell opts
+    # Create the parser for shell opts
     shell_parser = command_parser.add_parser("shell", help="start or message the shell")
     shell_parser.set_defaults(cls=shell.Command)
     shell_parser.add_argument("message", nargs="*", help="a message to send to the shell")
@@ -25,12 +25,12 @@ def parse_args() -> (argparse.ArgumentParser, argparse.Namespace):
     shell_parser.add_argument("-k", "--kill", action="store_true", help="kill the shell")
     shell_parser.add_argument("--log-rules", metavar="RULES", help="log rules to apply")
 
-    # Create parser for toggle opts
+    # Create the parser for toggle opts
     toggle_parser = command_parser.add_parser("toggle", help="toggle a special workspace")
     toggle_parser.set_defaults(cls=toggle.Command)
     toggle_parser.add_argument("workspace", help="the workspace to toggle")
 
-    # Create parser for scheme opts
+    # Create the parser for scheme opts
     scheme_parser = command_parser.add_parser("scheme", help="manage the colour scheme")
     scheme_command_parser = scheme_parser.add_subparsers(title="subcommands")
 
@@ -57,7 +57,7 @@ def parse_args() -> (argparse.ArgumentParser, argparse.Namespace):
     set_parser.add_argument("-m", "--mode", choices=["dark", "light"], help="the mode to switch to")
     set_parser.add_argument("-v", "--variant", choices=scheme_variants, help="the variant to switch to")
 
-    # Create parser for screenshot opts
+    # Create the parser for screenshot opts
     screenshot_parser = command_parser.add_parser("screenshot", help="take a screenshot")
     screenshot_parser.set_defaults(cls=screenshot.Command)
     screenshot_parser.add_argument("-r", "--region", nargs="?", const="slurp", help="take a screenshot of a region")
@@ -65,25 +65,25 @@ def parse_args() -> (argparse.ArgumentParser, argparse.Namespace):
         "-f", "--freeze", action="store_true", help="freeze the screen while selecting a region"
     )
 
-    # Create parser for record opts
+    # Create the parser for record opts
     record_parser = command_parser.add_parser("record", help="start a screen recording")
     record_parser.set_defaults(cls=record.Command)
     record_parser.add_argument("-r", "--region", nargs="?", const="slurp", help="record a region")
     record_parser.add_argument("-s", "--sound", action="store_true", help="record audio")
     record_parser.add_argument("-p", "--pause", action="store_true", help="pause/resume the recording")
 
-    # Create parser for clipboard opts
+    # Create the parser for clipboard opts
     clipboard_parser = command_parser.add_parser("clipboard", help="open clipboard history")
     clipboard_parser.set_defaults(cls=clipboard.Command)
     clipboard_parser.add_argument("-d", "--delete", action="store_true", help="delete from clipboard history")
 
-    # Create parser for emoji-picker opts
+    # Create the parser for emoji-picker opts
     emoji_parser = command_parser.add_parser("emoji", help="emoji/glyph utilities")
     emoji_parser.set_defaults(cls=emoji.Command)
     emoji_parser.add_argument("-p", "--picker", action="store_true", help="open the emoji/glyph picker")
     emoji_parser.add_argument("-f", "--fetch", action="store_true", help="fetch emoji/glyph data from remote")
 
-    # Create parser for wallpaper opts
+    # Create the parser for wallpaper opts
     wallpaper_parser = command_parser.add_parser("wallpaper", help="manage the wallpaper")
     wallpaper_parser.set_defaults(cls=wallpaper.Command)
     wallpaper_parser.add_argument(
@@ -107,7 +107,7 @@ def parse_args() -> (argparse.ArgumentParser, argparse.Namespace):
         help="do not automatically change the scheme mode based on wallpaper colour",
     )
 
-    # Create parser for resizer opts
+    # Create the parser for resizer opts
     resizer_parser = command_parser.add_parser("resizer", help="window resizer daemon")
     resizer_parser.set_defaults(cls=resizer.Command)
     resizer_parser.add_argument("-d", "--daemon", action="store_true", help="start the resizer daemon")

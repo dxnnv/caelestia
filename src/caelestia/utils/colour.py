@@ -2,9 +2,9 @@ class Colour:
     _rgb_vals: tuple[int, ...]
     _hex_vals: tuple[str, ...]
 
-    def __init__(self, hex: str):
-        hex = hex.ljust(8, "f")
-        self._hex_vals = tuple(hex[i : i + 2] for i in range(0, 7, 2))
+    def __init__(self, hexcolor: str):
+        hexcolor = hexcolor.ljust(8, "f")
+        self._hex_vals = tuple(hexcolor[i: i + 2] for i in range(0, 7, 2))
         self._rgb_vals = tuple(int(h, 16) for h in self._hex_vals)
 
     @property

@@ -112,7 +112,9 @@ class List:
                     if s.mode not in modes:
                         s._mode = modes[0]
                     try:
-                        s._update_colours()
+                        if hasattr(s, "_update_colours"):
+                            uc = getattr(s, "_update_colours")
+                            uc()
                         schemes[scheme][flavour] = s.colours
                     except ValueError:
                         pass

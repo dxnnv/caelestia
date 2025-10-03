@@ -48,8 +48,8 @@ class Score:
             proportion_score = proportion * 100.0 * Score.WEIGHT_PROPORTION
             chroma_weight = Score.WEIGHT_CHROMA_BELOW if hct.chroma < Score.TARGET_CHROMA else Score.WEIGHT_CHROMA_ABOVE
             chroma_score = (hct.chroma - Score.TARGET_CHROMA) * chroma_weight
-            score = proportion_score + chroma_score
-            scored_hct.append({"hct": hct, "score": score})
+            scr = proportion_score + chroma_score
+            scored_hct.append({"hct": hct, "score": scr})
 
         scored_hct.sort(key=lambda x: x["score"], reverse=True)
 

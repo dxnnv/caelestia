@@ -1,11 +1,11 @@
 import subprocess
 
 
-def notify(*args: list[str]) -> str:
+def notify(*args: str) -> str:
     return subprocess.check_output(["notify-send", "-a", "caelestia-cli", *args], text=True).strip()
 
 
-def close_notification(id: str) -> None:
+def close_notification(identifier: str) -> None:
     subprocess.run(
         [
             "gdbus",
@@ -14,7 +14,7 @@ def close_notification(id: str) -> None:
             "--dest=org.freedesktop.Notifications",
             "--object-path=/org/freedesktop/Notifications",
             "--method=org.freedesktop.Notifications.CloseNotification",
-            id,
+            identifier,
         ],
         stdout=subprocess.DEVNULL,
     )

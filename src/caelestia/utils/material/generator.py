@@ -16,8 +16,8 @@ from materialyoucolor.scheme.scheme_vibrant import SchemeVibrant
 from materialyoucolor.utils.math_utils import difference_degrees, rotation_direction, sanitize_degrees_double
 
 
-def hex_to_hct(hex: str) -> Hct:
-    return Hct.from_int(int(f"0xFF{hex}", 16))
+def hex_to_hct(hexcolor: str) -> Hct:
+    return Hct.from_int(int(f"0xFF{hexcolor}", 16))
 
 
 light_gruvbox = [
@@ -145,7 +145,7 @@ def darken(colour: Hct, amount: float) -> Hct:
     return Hct.from_hct(colour.hue, colour.chroma + diff / 5, colour.tone - diff)
 
 
-def get_scheme(scheme: str) -> DynamicScheme:
+def get_scheme(scheme: str) -> type[DynamicScheme]:
     if scheme == "content":
         return SchemeContent
     if scheme == "expressive":

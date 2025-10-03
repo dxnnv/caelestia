@@ -90,5 +90,5 @@ class Command:
         for glyph, names in buckets.items():
             data.append(f"{glyph}  {' '.join(names)}")
 
-        # Write to file
+        # Write to a file
         (cli_data_dir / "emojis.txt").write_text("\n".join(data))

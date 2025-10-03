@@ -2,6 +2,7 @@ import json
 import random
 from argparse import Namespace
 from pathlib import Path
+from typing import Any
 
 from materialyoucolor.hct import Hct
 from materialyoucolor.utils.color_utils import argb_from_rgb
@@ -30,7 +31,7 @@ def check_wall(wall: Path, filter_size: tuple[int, int], threshold: float) -> bo
         return width >= filter_size[0] * threshold and height >= filter_size[1] * threshold
 
 
-def get_wallpaper() -> str:
+def get_wallpaper() -> str | None:
     try:
         return wallpaper_path_path.read_text()
     except IOError:
@@ -38,24 +39,25 @@ def get_wallpaper() -> str:
 
 
 def get_wallpapers(args: Namespace) -> list[Path]:
-    dir = Path(args.random)
-    if not dir.is_dir():
+    directory = Path(args.random)
+    if not directory.is_dir():
         return []
 
-    walls = [f for f in dir.rglob("*") if is_valid_image(f)]
+    walls = [f for f in directory.rglob("*") if is_valid_image(f)]
 
     if args.no_filter:
         return walls
 
-    monitors = message("monitors")
-    filter_size = monitors[0]["width"], monitors[0]["height"]
+    monitors: dict[Any, Any] = message("monitors")
+    filter_size: list[int] = [monitors[0]["width"], monitors[0]["height"]]
     for monitor in monitors[1:]:
         if filter_size[0] > monitor["width"]:
             filter_size[0] = monitor["width"]
         if filter_size[1] > monitor["height"]:
             filter_size[1] = monitor["height"]
 
-    return [f for f in walls if check_wall(f, filter_size, args.threshold)]
+    size = filter_size[0], filter_size[1]
+    return [f for f in walls if check_wall(f, size, args.threshold)]
 
 
 def get_thumb(wall: Path, cache: Path) -> Path:
@@ -64,14 +66,14 @@ def get_thumb(wall: Path, cache: Path) -> Path:
     if not thumb.exists():
         with Image.open(wall) as img:
             img = img.convert("RGB")
-            img.thumbnail((128, 128), Image.NEAREST)
+            img.thumbnail((128, 128), Image.Resampling.NEAREST)
             thumb.parent.mkdir(parents=True, exist_ok=True)
             img.save(thumb, "JPEG")
 
     return thumb
 
 
-def get_smart_opts(wall: Path, cache: Path) -> str:
+def get_smart_opts(wall: Path, cache: Path) -> dict[Any, Any]:
     opts_cache = cache / "smart.json"
 
     try:
@@ -86,7 +88,7 @@ def get_smart_opts(wall: Path, cache: Path) -> str:
     with Image.open(get_thumb(wall, cache)) as img:
         opts["variant"] = get_variant(img)
 
-        img.thumbnail((1, 1), Image.LANCZOS)
+        img.thumbnail((1, 1), Image.Resampling.LANCZOS)
         hct = Hct.from_int(argb_from_rgb(*img.getpixel((0, 0))))
         opts["mode"] = "light" if hct.tone > 60 else "dark"
 
@@ -97,7 +99,7 @@ def get_smart_opts(wall: Path, cache: Path) -> str:
     return opts
 
 
-def get_colours_for_wall(wall: Path | str, no_smart: bool) -> None:
+def get_colours_for_wall(wall: Path | str, no_smart: bool) -> dict[str, str] | None:
     scheme = get_scheme()
     cache = wallpapers_cache_dir / compute_hash(wall)
 
@@ -125,7 +127,7 @@ def get_colours_for_wall(wall: Path | str, no_smart: bool) -> None:
 
 
 def set_wallpaper(wall: Path | str, no_smart: bool) -> None:
-    # Make path absolute
+    # Make the path absolute
     wall = Path(wall).resolve()
 
     if not is_valid_image(wall):

@@ -30,10 +30,10 @@ def gen_scss(colours: dict[str, str]) -> str:
     return scss
 
 
-def gen_replace(colours: dict[str, str], template: Path, hash: bool = False) -> str:
+def gen_replace(colours: dict[str, str], template: Path, _hash: bool = False) -> str:
     template = template.read_text()
     for name, colour in colours.items():
-        template = template.replace(f"{{{{ ${name} }}}}", f"#{colour}" if hash else colour)
+        template = template.replace(f"{{{{ ${name} }}}}", f"#{colour}" if _hash else colour)
     return template
 
 
@@ -57,7 +57,7 @@ def gen_replace_dynamic(colours: dict[str, str], template: Path) -> str:
 
 
 def c2s(c: str, *i: list[int]) -> str:
-    """Hex to ANSI sequence (e.g. ffffff, 11 -> \x1b]11;rgb:ff/ff/ff\x1b\\)"""
+    """Hex to the ANSI sequence (e.g., ffffff, 11 -> \x1b]11;rgb:ff/ff/ff\x1b\\)"""
     return f"\x1b]{';'.join(map(str, i))};rgb:{c[0:2]}/{c[2:4]}/{c[4:6]}\x1b\\"
 
 
@@ -73,29 +73,29 @@ def gen_sequences(colours: dict[str, str]) -> str:
         16+: 256 colours
     """
     return (
-        c2s(colours["onSurface"], 10)
-        + c2s(colours["surface"], 11)
-        + c2s(colours["secondary"], 12)
-        + c2s(colours["secondary"], 17)
-        + c2s(colours["term0"], 4, 0)
-        + c2s(colours["term1"], 4, 1)
-        + c2s(colours["term2"], 4, 2)
-        + c2s(colours["term3"], 4, 3)
-        + c2s(colours["term4"], 4, 4)
-        + c2s(colours["term5"], 4, 5)
-        + c2s(colours["term6"], 4, 6)
-        + c2s(colours["term7"], 4, 7)
-        + c2s(colours["term8"], 4, 8)
-        + c2s(colours["term9"], 4, 9)
-        + c2s(colours["term10"], 4, 10)
-        + c2s(colours["term11"], 4, 11)
-        + c2s(colours["term12"], 4, 12)
-        + c2s(colours["term13"], 4, 13)
-        + c2s(colours["term14"], 4, 14)
-        + c2s(colours["term15"], 4, 15)
-        + c2s(colours["primary"], 4, 16)
-        + c2s(colours["secondary"], 4, 17)
-        + c2s(colours["tertiary"], 4, 18)
+        c2s(colours["onSurface"], [10])
+        + c2s(colours["surface"], [11])
+        + c2s(colours["secondary"], [12])
+        + c2s(colours["secondary"], [17])
+        + c2s(colours["term0"], [4, 0])
+        + c2s(colours["term1"], [4, 1])
+        + c2s(colours["term2"], [4, 2])
+        + c2s(colours["term3"], [4, 3])
+        + c2s(colours["term4"], [4, 4])
+        + c2s(colours["term5"], [4, 5])
+        + c2s(colours["term6"], [4, 6])
+        + c2s(colours["term7"], [4, 7])
+        + c2s(colours["term8"], [4, 8])
+        + c2s(colours["term9"], [4, 9])
+        + c2s(colours["term10"], [4, 10])
+        + c2s(colours["term11"], [4, 11])
+        + c2s(colours["term12"], [4, 12])
+        + c2s(colours["term13"], [4, 13])
+        + c2s(colours["term14"], [4, 14])
+        + c2s(colours["term15"], [4, 15])
+        + c2s(colours["primary"], [4, 16])
+        + c2s(colours["secondary"], [4, 17])
+        + c2s(colours["tertiary"], [4, 18])
     )
 
 
@@ -151,27 +151,27 @@ def apply_fuzzel(colours: dict[str, str]) -> None:
 
 @log_exception
 def apply_btop(colours: dict[str, str]) -> None:
-    template = gen_replace(colours, templates_dir / "btop.theme", hash=True)
+    template = gen_replace(colours, templates_dir / "btop.theme", _hash=True)
     write_file(config_dir / "btop/themes/caelestia.theme", template)
     subprocess.run(["killall", "-USR2", "btop"], stderr=subprocess.DEVNULL)
 
 
 @log_exception
 def apply_nvtop(colours: dict[str, str]) -> None:
-    template = gen_replace(colours, templates_dir / "nvtop.colors", hash=True)
+    template = gen_replace(colours, templates_dir / "nvtop.colors", _hash=True)
     write_file(config_dir / "nvtop/nvtop.colors", template)
 
 
 @log_exception
 def apply_htop(colours: dict[str, str]) -> None:
-    template = gen_replace(colours, templates_dir / "htop.theme", hash=True)
+    template = gen_replace(colours, templates_dir / "htop.theme", _hash=True)
     write_file(config_dir / "htop/htoprc", template)
     subprocess.run(["killall", "-USR2", "htop"], stderr=subprocess.DEVNULL)
 
 
 @log_exception
 def apply_gtk(colours: dict[str, str], mode: str) -> None:
-    template = gen_replace(colours, templates_dir / "gtk.css", hash=True)
+    template = gen_replace(colours, templates_dir / "gtk.css", _hash=True)
     write_file(config_dir / "gtk-3.0/gtk.css", template)
     write_file(config_dir / "gtk-4.0/gtk.css", template)
 
@@ -182,7 +182,7 @@ def apply_gtk(colours: dict[str, str], mode: str) -> None:
 
 @log_exception
 def apply_qt(colours: dict[str, str], mode: str) -> None:
-    template = gen_replace(colours, templates_dir / f"qt{mode}.colors", hash=True)
+    template = gen_replace(colours, templates_dir / f"qt{mode}.colors", _hash=True)
     write_file(config_dir / "qt5ct/colors/caelestia.colors", template)
     write_file(config_dir / "qt6ct/colors/caelestia.colors", template)
 
@@ -211,14 +211,14 @@ general="Sans Serif,12,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
 def apply_warp(colours: dict[str, str], mode: str) -> None:
     warp_mode = "darker" if mode == "dark" else "lighter"
 
-    template = gen_replace(colours, templates_dir / "warp.yaml", hash=True)
+    template = gen_replace(colours, templates_dir / "warp.yaml", _hash=True)
     template = template.replace("{{ $warp_mode }}", warp_mode)
     write_file(data_dir / "warp-terminal/themes/caelestia.yaml", template)
 
 
 @log_exception
 def apply_cava(colours: dict[str, str]) -> None:
-    template = gen_replace(colours, templates_dir / "cava.conf", hash=True)
+    template = gen_replace(colours, templates_dir / "cava.conf", _hash=True)
     write_file(config_dir / "cava/config", template)
     subprocess.run(["killall", "-USR2", "cava"], stderr=subprocess.DEVNULL)
 

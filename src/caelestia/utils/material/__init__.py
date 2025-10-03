@@ -10,7 +10,7 @@ def get_score_for_image(image: Path | str, cache_base: Path):
     cache = cache_base / "score.json"
 
     try:
-        return Hct.from_int(cache.read_text())
+        return Hct.from_int(int(cache.read_text()))
     except (IOError, TypeError):
         pass
 

@@ -3,6 +3,7 @@ import shlex
 import shutil
 from argparse import Namespace
 from collections import ChainMap
+from typing import Any, Callable
 
 from caelestia.utils import hypr
 from caelestia.utils.paths import user_config_path
@@ -50,10 +51,15 @@ class DeepChainMap(ChainMap):
         return repr(dict(self))
 
 
+def specialws() -> None:
+    special = next(m for m in hypr.message("monitors") if m["focused"])["specialWorkspace"]["name"]
+    hypr.dispatch("togglespecialworkspace", special[8:] or "special")
+
+
 class Command:
     args: Namespace
-    cfg: dict[str, dict[str, dict[str, any]]] | DeepChainMap
-    clients: list[dict[str, any]] = None
+    cfg: dict[str, dict[str, dict[str, Any]]] | DeepChainMap
+    clients: str | dict[str, Any] = None
 
     def __init__(self, args: Namespace) -> None:
         self.args = args
@@ -108,7 +114,7 @@ class Command:
 
     def run(self) -> None:
         if self.args.workspace == "specialws":
-            self.specialws()
+            specialws()
             return
 
         spawned = False
@@ -120,18 +126,18 @@ class Command:
         if not spawned:
             hypr.dispatch("togglespecialworkspace", self.args.workspace)
 
-    def get_clients(self) -> list[dict[str, any]]:
+    def get_clients(self) -> str | dict[str, Any]:
         if self.clients is None:
             self.clients = hypr.message("clients")
 
         return self.clients
 
-    def move_client(self, selector: callable, workspace: str) -> None:
+    def move_client(self, selector: Callable, workspace: str) -> None:
         for client in self.get_clients():
             if selector(client) and client["workspace"]["name"] != f"special:{workspace}":
                 hypr.dispatch("movetoworkspacesilent", f"special:{workspace},address:{client['address']}")
 
-    def spawn_client(self, selector: callable, spawn: list[str]) -> bool:
+    def spawn_client(self, selector: Callable, spawn: list[str]) -> bool:
         if (spawn[0].endswith(".desktop") or shutil.which(spawn[0])) and not any(
             selector(client) for client in self.get_clients()
         ):
@@ -139,8 +145,8 @@ class Command:
             return True
         return False
 
-    def handle_client_config(self, client: dict[str, any]) -> bool:
-        def selector(c: dict[str, any]) -> bool:
+    def handle_client_config(self, client: dict[str, Any]) -> bool:
+        def selector(c: dict[str, Any]) -> bool:
             # Each match is or, inside matches is and
             for match in client["match"]:
                 if is_subset(c, match):
@@ -154,7 +160,3 @@ class Command:
             self.move_client(selector, self.args.workspace)
 
         return spawned
-
-    def specialws(self) -> None:
-        special = next(m for m in hypr.message("monitors") if m["focused"])["specialWorkspace"]["name"]
-        hypr.dispatch("togglespecialworkspace", special[8:] or "special")

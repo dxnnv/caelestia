@@ -1,6 +1,7 @@
 import json
 import random
 from pathlib import Path
+from typing import Any
 
 from caelestia.utils.notify import notify
 from caelestia.utils.paths import atomic_dump, scheme_data_dir, scheme_path
@@ -12,21 +13,24 @@ class Scheme:
     _mode: str
     _variant: str
     _colours: dict[str, str]
+    _default: bool
     notify: bool
 
-    def __init__(self, json: dict[str, any] | None) -> None:
-        if json is None:
+    def __init__(self, jsondict: dict[str, Any] | None) -> None:
+        if jsondict is None:
             self._name = "catppuccin"
             self._flavour = "mocha"
             self._mode = "dark"
             self._variant = "tonalspot"
-            self._colours = read_colours_from_file(self.get_colours_path())
+            self._colours = self.read_colours_from_file(self.get_colours_path())
+            self._default = True
         else:
-            self._name = json["name"]
-            self._flavour = json["flavour"]
-            self._mode = json["mode"]
-            self._variant = json["variant"]
-            self._colours = json["colours"]
+            self._name = jsondict["name"]
+            self._flavour = jsondict["flavour"]
+            self._mode = jsondict["mode"]
+            self._variant = jsondict["variant"]
+            self._colours = jsondict["colours"]
+            self._default = False
         self.notify = False
 
     @property
@@ -119,6 +123,18 @@ class Scheme:
     def get_colours_path(self) -> Path:
         return (scheme_data_dir / self.name / self.flavour / self.mode).with_suffix(".txt")
 
+    @property
+    def default(self) -> bool:
+        return self._default
+
+    @variant.setter
+    def variant(self, state: bool) -> None:
+        if state == self._default:
+            return
+
+        self._default = state
+        self.save()
+
     def save(self) -> None:
         scheme_path.parent.mkdir(parents=True, exist_ok=True)
         atomic_dump(
@@ -129,6 +145,7 @@ class Scheme:
                 "mode": self.mode,
                 "variant": self.variant,
                 "colours": self.colours,
+                "default": self.default,
             },
         )
 
@@ -170,7 +187,7 @@ class Scheme:
                     "No wallpaper set. Please set a wallpaper via `caelestia wallpaper` before setting a dynamic scheme."
                 )
         else:
-            self._colours = read_colours_from_file(self.get_colours_path())
+            self._colours = self.read_colours_from_file(self.get_colours_path())
 
     def __str__(self) -> str:
         return (
@@ -182,6 +199,9 @@ class Scheme:
             f"    Colours:\n"
             f"        {'\n        '.join(f'{n}: \x1b[38;2;{int(c[0:2], 16)};{int(c[2:4], 16)};{int(c[4:6], 16)}m{c}\x1b[0m' for n, c in self.colours.items())}"
         )
+
+    def read_colours_from_file(self, path: Path) -> dict[str, str]:
+        return {k.strip(): v.strip() for k, v in (line.split(" ") for line in path.read_text().splitlines())}
 
 
 scheme_variants = [
@@ -196,11 +216,7 @@ scheme_variants = [
     "content",
 ]
 
-scheme: Scheme = None
-
-
-def read_colours_from_file(path: Path) -> dict[str, str]:
-    return {k.strip(): v.strip() for k, v in (line.split(" ") for line in path.read_text().splitlines())}
+scheme: Scheme = Scheme(None)
 
 
 def get_scheme_path() -> Path:
@@ -210,7 +226,7 @@ def get_scheme_path() -> Path:
 def get_scheme() -> Scheme:
     global scheme
 
-    if scheme is None:
+    if scheme.default:
         try:
             scheme_json = json.loads(scheme_path.read_text())
             scheme = Scheme(scheme_json)
@@ -225,18 +241,18 @@ def get_scheme_names() -> list[str]:
     return [*(f.name for f in scheme_data_dir.iterdir() if f.is_dir()), "dynamic"]
 
 
-def get_scheme_flavours(name: str = None) -> list[str]:
-    if name is None:
+def get_scheme_flavours(name: str = "") -> list[str]:
+    if name == "":
         name = get_scheme().name
 
     return ["default"] if name == "dynamic" else [f.name for f in (scheme_data_dir / name).iterdir() if f.is_dir()]
 
 
-def get_scheme_modes(name: str = None, flavour: str = None) -> list[str]:
-    if name is None:
-        scheme = get_scheme()
-        name = scheme.name
-        flavour = scheme.flavour
+def get_scheme_modes(name: str = "", flavour: str = "") -> list[str]:
+    if name == "":
+        schm = get_scheme()
+        name = schm.name
+        flavour = schm.flavour
 
     if name == "dynamic":
         return ["light", "dark"]

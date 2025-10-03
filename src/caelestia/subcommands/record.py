@@ -12,6 +12,14 @@ from caelestia.utils.paths import recording_notif_path, recording_path, recordin
 RECORDER = "gpu-screen-recorder"
 
 
+def proc_running() -> bool:
+    return subprocess.run(["pidof", RECORDER], stdout=subprocess.DEVNULL).returncode == 0
+
+
+def intersects(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> bool:
+    return a[0] < b[0] + b[2] and a[0] + a[2] > b[0] and a[1] < b[1] + b[3] and a[1] + a[3] > b[1]
+
+
 class Command:
     args: Namespace
 
@@ -21,16 +29,10 @@ class Command:
     def run(self) -> None:
         if self.args.pause:
             subprocess.run(["pkill", "-USR2", "-f", RECORDER], stdout=subprocess.DEVNULL)
-        elif self.proc_running():
+        elif proc_running():
             self.stop()
         else:
             self.start()
-
-    def proc_running(self) -> bool:
-        return subprocess.run(["pidof", RECORDER], stdout=subprocess.DEVNULL).returncode == 0
-
-    def intersects(self, a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> bool:
-        return a[0] < b[0] + b[2] and a[0] + a[2] > b[0] and a[1] < b[1] + b[3] and a[1] + a[3] > b[1]
 
     def start(self) -> None:
         args = ["-w"]
@@ -51,7 +53,7 @@ class Command:
             r = x, y, w, h
             max_rr = 0
             for monitor in monitors:
-                if self.intersects((monitor["x"], monitor["y"], monitor["width"], monitor["height"]), r):
+                if intersects((monitor["x"], monitor["y"], monitor["width"], monitor["height"]), r):
                     rr = round(monitor["refreshRate"])
                     max_rr = max(max_rr, rr)
             args += ["-f", str(max_rr)]
@@ -90,14 +92,14 @@ class Command:
             pass
 
     def stop(self) -> None:
-        # Start killing recording process
+        # Start killing the recording process
         subprocess.run(["pkill", "-f", RECORDER], stdout=subprocess.DEVNULL)
 
-        # Wait for recording to finish to avoid corrupted video file
-        while self.proc_running():
+        # Wait for the recording to finish to avoid a corrupted video file
+        while proc_running():
             time.sleep(0.1)
 
-        # Move to recordings folder
+        # Move to the recordings folder
         new_path = recordings_dir / f"recording_{datetime.now().strftime('%Y%m%d_%H-%M-%S')}.mp4"
         recordings_dir.mkdir(exist_ok=True, parents=True)
         shutil.move(recording_path, new_path)
