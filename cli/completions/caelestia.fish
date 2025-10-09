@@ -24,10 +24,7 @@ complete -c caelestia -n $not_seen -a 'resizer' -d 'Window resizer'
 # Shell
 set -l commands mpris drawers wallpaper notifs
 set -l not_seen "$seen shell && not $seen $commands"
-complete -c caelestia -n $not_seen -s 'd' -l 'daemon' -d 'Start the shell detached'
 complete -c caelestia -n $not_seen -s 's' -l 'show' -d 'Print all IPC commands'
-complete -c caelestia -n $not_seen -s 'l' -l 'log' -d 'Print the shell log'
-complete -c caelestia -n $not_seen -l 'log-rules' -d 'Log rules to apply'
 complete -c caelestia -n $not_seen -a 'mpris' -d 'Mpris control'
 complete -c caelestia -n $not_seen -a 'drawers' -d 'Toggle drawers'
 complete -c caelestia -n $not_seen -a 'wallpaper' -d 'Wallpaper control (for internal use)'
@@ -71,7 +68,7 @@ complete -c caelestia -n "$seen shell && $seen wallpaper && $seen set" -F
 complete -c caelestia -n "$seen shell && $seen notifs && not $seen clear" -a 'clear' -d 'Clear popup notifications'
 
 # Toggles
-set -l commands communication music specialws sysmon todo
+set -l commands communication music specialws sysmon todo notes
 complete -c caelestia -n "$seen toggle && not $seen drawers && not $seen $commands" -a "$commands" -d 'toggle'
 
 # Scheme

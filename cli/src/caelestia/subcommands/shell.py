@@ -1,14 +1,7 @@
-import signal
+import os
 import subprocess
 from argparse import Namespace
-
-from caelestia.utils.paths import c_cache_dir
-
-
-def filter_log(lines, *, end="\n"):
-    for line in lines:
-        if f"Cannot open: file://{c_cache_dir}/imagecache/" not in line:
-            print(line, end, flush=True)
+from pathlib import Path
 
 
 class Command:
@@ -18,54 +11,31 @@ class Command:
         self.args = args
 
     def run(self) -> None:
+        output = "Nothing to do. Try: message | -s(how)"
         if self.args.show:
-            ipc = self.shell("ipc", "show").replace("target ", "").replace("function ", "")
-            print(ipc, end="")
-            return
-
-        if self.args.log:
-            args = ["log"]
-            if self.args.log_rules:
-                args += ["-r", self.args.log_rules]
-            filter_log(self.shell(*args).splitlines(True), end="")
-            return
-
-        if self.args.kill:
-            # Kill the shell
-            self.shell("kill")
-            return
-
-        if self.args.message:
-            print(self.shell("ipc", "call", *self.args.message), end="")
-            return
-
-        # Start the shell
-        args = ["qs", "-c", "caelestia", "-n"]
-        if self.args.log_rules:
-            args += ["--log-rules", self.args.log_rules]
-
-        if self.args.daemon:
-            subprocess.run(args, check=True)
-            return
-
-        shell = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, bufsize=1)
-
-        try:
-            if shell.stdout is not None:
-                filter_log(iter(shell.stdout.readline, ""), end="")
-            shell.wait()
-        except KeyboardInterrupt:
-            try:
-                shell.send_signal(signal.SIGINT)
-            except Exception:
-                pass
-        finally:
-            if shell.poll() is None:
-                shell.terminate()
-                try:
-                    shell.wait(timeout=3)
-                except subprocess.TimeoutExpired:
-                    shell.kill()
+            output = self.shell("ipc", "show").replace("target ", "").replace("function ", "")
+        elif self.args.message:
+            output = self.shell("ipc", "call", *self.args.message)
+        print(output, end="")
 
     def shell(self, *args: str) -> str:
-        return subprocess.check_output(["qs", "-c", "caelestia", *args], text=True)
+        return subprocess.check_output(
+            ["qs", "-c", "caelestia", *args],
+            text=True,
+            env=self._env_with_qml(),
+        )
+
+    def _env_with_qml(self) -> dict:
+        env = os.environ.copy()
+        hints = [
+            os.path.expanduser("~/.local/lib/qt6/qml"),
+            "/usr/lib/qt6/qml",
+            "/usr/local/lib/qt6/qml",
+            str(Path(__file__).resolve().parents[4] / "shell" / "build" / "qml"),
+        ]
+        existing = env.get("QML2_IMPORT_PATH", "")
+        path = [p for p in hints if p and os.path.isdir(p)]
+        if existing:
+            path.append(existing)
+        env["QML2_IMPORT_PATH"] = ":".join(dict.fromkeys(path))
+        return env
