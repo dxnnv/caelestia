@@ -31,10 +31,14 @@ def gen_scss(colours: dict[str, str]) -> str:
 
 
 def gen_replace(colours: dict[str, str], template: Path, _hash: bool = False) -> str:
-    template = template.read_text()
+    text = template.read_text()
+
     for name, colour in colours.items():
-        template = template.replace(f"{{{{ ${name} }}}}", f"#{colour}" if _hash else colour)
-    return template
+        pattern = re.compile(r"\{\{\s*\$" + re.escape(name) + r"\s*\}\}")
+        repl = f"#{colour}" if _hash else colour
+        text = pattern.sub(repl, text)
+
+    return text
 
 
 def gen_replace_dynamic(colours: dict[str, str], template: Path) -> str:
@@ -133,8 +137,10 @@ def apply_discord(scss: str) -> None:
         (Path(tmp_dir) / "_colours.scss").write_text(scss)
         conf = subprocess.check_output(["sass", "-I", tmp_dir, templates_dir / "discord.scss"], text=True)
 
-    for client in "Equicord", "Vencord", "BetterDiscord", "equibop", "vesktop", "legcord":
-        write_file(config_dir / client / "themes/caelestia.theme.css", conf)
+    for client in ("Equicord", "Vencord", "BetterDiscord", "equibop", "vesktop", "legcord"):
+        client_dir = config_dir / client / "themes"
+        if client_dir.exists() and client_dir.is_dir():
+            write_file(client_dir / "caelestia.theme.css", conf)
 
 
 @log_exception
@@ -224,6 +230,29 @@ def apply_cava(colours: dict[str, str]) -> None:
 
 
 @log_exception
+def apply_kitty(colours: dict[str, str]) -> None:
+    theme_text = gen_replace(colours, templates_dir / "kitty.conf", _hash=True)
+    theme_path = config_dir / "kitty/themes/caelestia.conf"
+    write_file(theme_path, theme_text)
+
+    try:
+        subprocess.run(
+            ["kitty", "@", "set-colors", "--all", "--configured", str(theme_path)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+        subprocess.run(
+            ["kitty", "@", "set-colors", "--all", "selection_background=" + "#" + colours["secondary"]],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            check=False,
+        )
+    except FileNotFoundError:
+        pass
+
+
+@log_exception
 def apply_user_templates(colours: dict[str, str]) -> None:
     if not user_templates_dir.is_dir():
         return
@@ -232,6 +261,38 @@ def apply_user_templates(colours: dict[str, str]) -> None:
         if file.is_file():
             content = gen_replace_dynamic(colours, file)
             write_file(theme_dir / file.name, content)
+
+
+@log_exception
+def run_fastfetch(colours: dict[str, str]) -> None:
+    def hexc(key: str) -> str:
+        return f"#{colours[key]}"
+
+    args = [
+        "fastfetch",
+        "--color-keys",
+        hexc("secondary"),
+        "--color-title",
+        hexc("primary"),
+        "--percent-color-green",
+        hexc("primary"),
+        "--percent-color-yellow",
+        hexc("tertiary"),
+        "--percent-color-red",
+        hexc("term9"),
+        "--logo-color-1",
+        hexc("primary"),
+        "--logo-color-2",
+        hexc("secondary"),
+        "--logo-color-3",
+        hexc("tertiary"),
+        "--logo-color-4",
+        hexc("onSurface"),
+    ]
+    try:
+        subprocess.run(args, check=False)
+    except FileNotFoundError:
+        pass
 
 
 def apply_colours(colours: dict[str, str], mode: str) -> None:
@@ -267,4 +328,7 @@ def apply_colours(colours: dict[str, str], mode: str) -> None:
         apply_warp(colours, mode)
     if check("enableCava"):
         apply_cava(colours)
+    if check("enableKitty"):
+        apply_kitty(colours)
+    run_fastfetch(colours)
     apply_user_templates(colours)
