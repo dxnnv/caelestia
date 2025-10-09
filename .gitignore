@@ -1,9 +1,15 @@
-.direnv
-/result
-/.qmlls.ini
-build/
+# Generated Folders
 .cache/
 __pycache__/
-/dist/
-*.zst
+build/
+dist/
+result/
+
+# Generated Files
 .qmlls.ini
+*.user
+*.zst
+
+# Environment
+.direnv
+.vscode/
