@@ -5,7 +5,6 @@ pkg_check_modules(Pipewire IMPORTED_TARGET libpipewire-0.3 REQUIRED)
 pkg_check_modules(Aubio IMPORTED_TARGET aubio REQUIRED)
 pkg_check_modules(Cava IMPORTED_TARGET cava REQUIRED)
 
-set(QT_QML_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/qml")
 qt_standard_project_setup(REQUIRES 6.9)
 
 function(qml_module arg_TARGET)

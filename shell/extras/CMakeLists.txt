@@ -6,4 +6,11 @@ target_compile_definitions(version PRIVATE
     GIT_REVISION="${GIT_REVISION}"
     DISTRIBUTOR="${DISTRIBUTOR}"
 )
-install(TARGETS version DESTINATION ${INSTALL_LIBDIR})
+
+set_target_properties(version PROPERTIES
+  AUTOMOC OFF
+  AUTOUIC OFF
+  AUTORCC OFF
+)
+
+install(TARGETS version DESTINATION ${INSTALL_BINDIR})
