@@ -17,12 +17,32 @@ Item {
     anchors.left: parent?.left
     anchors.right: parent?.right
 
+    function hideApp(id) {
+        const cur = Config.launcher.hiddenApps ?? [];
+        if (!cur.includes(id))
+            Config.launcher.hiddenApps = cur.concat(id);
+    }
+
     StateLayer {
         radius: Appearance.rounding.normal
 
         function onClicked(): void {
             Apps.launch(root.modelData);
             root.visibilities.launcher = false;
+        }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.MiddleButton
+        onClicked: function (mouse) {
+            if (mouse.button !== Qt.MiddleButton)
+                return;
+            const id = root.modelData.id;
+            const cur = Config.launcher.hiddenApps ?? [];
+            if (!cur.includes(id))
+                Config.launcher.hiddenApps = cur.concat(id);
+            Config.save();
         }
     }
 
