@@ -4,6 +4,7 @@ requires-python = ">=3.13"
 
 [[package]]
 name = "caelestia"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "materialyoucolor" },
