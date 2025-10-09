@@ -3,3 +3,7 @@
 /.qmlls.ini
 build/
 .cache/
+__pycache__/
+/dist/
+*.zst
+.qmlls.ini
