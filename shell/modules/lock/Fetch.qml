@@ -41,7 +41,7 @@ ColumnLayout {
 
         MonoText {
             Layout.fillWidth: true
-            text: "caelestiafetch.sh"
+            text: "fetch.sh"
             font.pointSize: root.width > 400 ? Appearance.font.size.larger : Appearance.font.size.normal
             elide: Text.ElideRight
         }
@@ -80,7 +80,7 @@ ColumnLayout {
                 active: root.height > 200
 
                 sourceComponent: FetchText {
-                    text: `OS  : ${SysInfo.osPrettyName || SysInfo.osName}`
+                    text: `OS   | ${SysInfo.osPrettyName || SysInfo.osName}`
                 }
             }
 
@@ -89,7 +89,7 @@ ColumnLayout {
                 active: root.height > 110
 
                 sourceComponent: FetchText {
-                    text: `WM  : ${SysInfo.wm}`
+                    text: `WM   | ${SysInfo.wm}`
                 }
             }
 
@@ -98,12 +98,12 @@ ColumnLayout {
                 active: root.height > 110
 
                 sourceComponent: FetchText {
-                    text: `USER: ${SysInfo.user}`
+                    text: `USER | ${SysInfo.user}`
                 }
             }
 
             FetchText {
-                text: `UP  : ${SysInfo.uptime}`
+                text: `UP   | ${SysInfo.uptime}`
             }
         }
     }
