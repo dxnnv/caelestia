@@ -31,6 +31,7 @@ Singleton {
     }
 
     FileView {
+        id: fv
         path: `${Paths.config}/shell.json`
         watchChanges: true
         onFileChanged: {
@@ -73,5 +74,9 @@ Singleton {
             property ServiceConfig services: ServiceConfig {}
             property UserPaths paths: UserPaths {}
         }
+    }
+
+    function save() {
+        fv.writeAdapter();
     }
 }
