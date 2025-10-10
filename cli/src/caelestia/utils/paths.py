@@ -1,3 +1,4 @@
+import contextlib
 import hashlib
 import json
 import os
@@ -72,7 +73,5 @@ def atomic_dump(path: Path, content: dict[str, Any]) -> None:
         os.replace(tmp_path, path)
     finally:
         if tmp_path.exists():
-            try:
+            with contextlib.suppress(OSError):
                 tmp_path.unlink()
-            except OSError:
-                pass
