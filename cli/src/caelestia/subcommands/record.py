@@ -1,11 +1,14 @@
+import contextlib
 import json
 import re
 import shutil
 import subprocess
 import time
-from argparse import Namespace
+from argparse import ArgumentParser
 from datetime import datetime
 
+import caelestia.utils.runner as runner
+from caelestia.command import BaseCommand, register
 from caelestia.utils.notify import close_notification, notify
 from caelestia.utils.paths import recording_notif_path, recording_path, recordings_dir, user_config_path
 
@@ -20,12 +23,19 @@ def intersects(a: tuple[int, int, int, int], b: tuple[int, int, int, int]) -> bo
     return a[0] < b[0] + b[2] and a[0] + a[2] > b[0] and a[1] < b[1] + b[3] and a[1] + a[3] > b[1]
 
 
-class Command:
-    args: Namespace
+def _configure(sub: ArgumentParser) -> None:
+    act = sub.add_mutually_exclusive_group(required=True)
+    act.add_argument("--start", action="store_true", help="Start recording")
+    act.add_argument("--stop", action="store_true", help="Stop recording")
+    act.add_argument("--pause", action="store_true", help="Pause recording")
+    act.add_argument("--resume", action="store_true", help="Resume recording")
+    sub.add_argument("--region", metavar="WxH+X+Y", help="Region to record")
+    sub.add_argument("--fps", type=int, default=60, help="Frames per second")
+    sub.add_argument("--output", type=str, help="Output file path")
 
-    def __init__(self, args: Namespace) -> None:
-        self.args = args
 
+@register("record", help="Screen recording", configure_parser=_configure)
+class Command(BaseCommand):
     def run(self) -> None:
         if self.args.pause:
             subprocess.run(["pkill", "-USR2", "-f", RECORDER], stdout=subprocess.DEVNULL)
@@ -37,10 +47,10 @@ class Command:
     def start(self) -> None:
         args = ["-w"]
 
-        monitors = json.loads(subprocess.check_output(["hyprctl", "monitors", "-j"]))
+        monitors = json.loads(runner.check(["hyprctl", "monitors", "-j"]))
         if self.args.region:
             if self.args.region == "slurp":
-                region = subprocess.check_output(["slurp", "-f", "%wx%h+%x+%y"], text=True)
+                region = runner.check(["slurp", "-f", "%wx%h+%x+%y"], text=True)
             else:
                 region = self.args.region.strip()
             args += ["region", "-region", region]
@@ -72,7 +82,7 @@ class Command:
         except (json.JSONDecodeError, FileNotFoundError):
             pass
         except TypeError as e:
-            raise ValueError(f"Config option 'record.extraArgs' should be an array: {e}")
+            raise ValueError(f"Config option 'record.extraArgs' should be an array: {e}") from e
 
         recording_path.parent.mkdir(parents=True, exist_ok=True)
         proc = subprocess.Popen([RECORDER, *args, "-o", str(recording_path)], start_new_session=True)
@@ -86,7 +96,7 @@ class Command:
                 notify(
                     "Recording failed",
                     "An error occurred attempting to start recorder. "
-                    f"Command `{' '.join(proc.args)}` failed with exit code {proc.returncode}",
+                    f"Command `{' '.join(args)}` failed with exit code {proc.returncode}",
                 )
         except subprocess.TimeoutExpired:
             pass
@@ -105,10 +115,8 @@ class Command:
         shutil.move(recording_path, new_path)
 
         # Close start notification
-        try:
+        with contextlib.suppress(IOError):
             close_notification(recording_notif_path.read_text())
-        except IOError:
-            pass
 
         action = notify(
             "--action=watch=Watch",

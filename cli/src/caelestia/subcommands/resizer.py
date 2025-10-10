@@ -2,22 +2,35 @@ import json
 import re
 import socket
 import time
-from argparse import Namespace
+from argparse import ArgumentParser, Namespace
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
+from caelestia.command import BaseCommand, register
 from caelestia.utils import hypr
 from caelestia.utils.logging import log_message
 from caelestia.utils.paths import user_config_path
 
 
+def _configure(sub: ArgumentParser) -> None:
+    sub.add_argument("--daemon", action="store_true", help="Run as Hyprland event daemon")
+    sub.add_argument("--once", action="store_true", help="Process one pass and exit (debug)")
+    # (If you support active mode args, define them here too:)
+    sub.add_argument("pattern", nargs="?", help="pattern or 'active'/'pip'")
+    sub.add_argument("match_type", nargs="?", choices=["titleContains", "titleExact", "titleRegex", "initialTitle"])
+    sub.add_argument("width", nargs="?", help="width (e.g., 30% or 1200)")
+    sub.add_argument("height", nargs="?", help="height (e.g., 60% or 800)")
+    sub.add_argument("actions", nargs="?", help="comma-separated actions (float,center,pip)")
+
+
+@dataclass
 class WindowRule:
-    def __init__(self, name: str, match_type: str, width: str, height: str, actions: list[str]):
-        self.name = name
-        self.match_type = match_type
-        self.width = width
-        self.height = height
-        self.actions = actions
+    name: str
+    match_type: str
+    width: str
+    height: str
+    actions: list[str]
 
 
 def _apply_pip_action(window_id: str) -> None:
@@ -82,9 +95,12 @@ def _apply_pip_action(window_id: str) -> None:
         monitor_x = monitor.get("x")
         monitor_y = monitor.get("y")
 
-        if not all(isinstance(x, (int, float)) for x in [monitor_height, monitor_width, monitor_scale, monitor_x, monitor_y]):
+        if not all(
+            isinstance(x, (int, float)) for x in [monitor_height, monitor_width, monitor_scale, monitor_x, monitor_y]
+        ):
             return
 
+        assert monitor_height and monitor_width
         monitor_height = monitor_height / monitor_scale
         monitor_width = monitor_width / monitor_scale
 
@@ -109,9 +125,7 @@ def _apply_pip_action(window_id: str) -> None:
         command2 = f"dispatch movewindowpixel exact {int(move_x)} {int(move_y)},address:{address}"
         hypr.batch(command1, command2)
 
-        log_message(
-            f"Applied PiP action to window {address}: {scaled_width}x{scaled_height} at ({move_x}, {move_y})"
-        )
+        log_message(f"Applied PiP action to window {address}: {scaled_width}x{scaled_height} at ({move_x}, {move_y})")
 
     except Exception as e:
         log_message(f"ERROR: Failed to apply PiP action to window 0x{window_id}: {e}")
@@ -122,28 +136,28 @@ def _run_pip_mode() -> None:
     try:
         active_window_result = hypr.message("activewindow")
         if not isinstance(active_window_result, dict) or not active_window_result.get("address"):
-            print("ERROR: No active window found")
+            log_message("ERROR: No active window found")
             return
 
         address = active_window_result.get("address", "")
         if not isinstance(address, str) or not address.startswith("0x"):
-            print("ERROR: Invalid window address")
+            log_message("ERROR: Invalid window address")
             return
 
         window_id = address[2:]  # Remove "0x" prefix
         window_title = active_window_result.get("title", "")
 
         if not active_window_result.get("floating", False):
-            print(f"Window '{window_title}' is not floating. PIP only works on floating windows.")
-            print("Try making it floating first with: hyprctl dispatch togglefloating")
+            log_message(f"Window '{window_title}' is not floating. PIP only works on floating windows.")
+            log_message("Try making it floating first with: hyprctl dispatch togglefloating")
             return
 
-        print(f"Applying PIP to active window: '{window_title}'")
+        log_message(f"Applying PIP to active window: '{window_title}'")
         _apply_pip_action(window_id)
-        print("PIP applied successfully")
+        log_message("PIP applied successfully")
 
     except Exception as e:
-        print(f"ERROR: Failed to apply PIP to active window: {e}")
+        log_message(f"ERROR: Failed to apply PIP to active window: {e}")
 
 
 def _find_matching_windows(temp_rule: WindowRule) -> list:
@@ -173,7 +187,7 @@ def _find_matching_windows(temp_rule: WindowRule) -> list:
                 try:
                     matches = bool(re.search(temp_rule.name, window_title))
                 except re.error:
-                    print(f"ERROR: Invalid regex pattern '{temp_rule.name}'")
+                    log_message(f"ERROR: Invalid regex pattern '{temp_rule.name}'")
                     return []
 
             if matches:
@@ -182,11 +196,11 @@ def _find_matching_windows(temp_rule: WindowRule) -> list:
         return matching_windows
 
     except Exception as e:
-        print(f"ERROR: Failed to find matching windows: {e}")
+        log_message(f"ERROR: Failed to find matching windows: {e}")
         return []
 
 
-def _get_window_info(window_id: str) -> Optional[Dict[str, Any]]:
+def _get_window_info(window_id: str) -> dict[str, Any] | None:
     try:
         clients = hypr.message("clients")
         if isinstance(clients, list):
@@ -261,33 +275,34 @@ def _apply_to_active_window(temp_rule: WindowRule) -> None:
     try:
         active_window_result = hypr.message("activewindow")
         if not isinstance(active_window_result, dict) or not active_window_result.get("address"):
-            print("ERROR: No active window found")
+            log_message("ERROR: No active window found")
             return
 
         window_title = active_window_result.get("title", "")
         address = active_window_result.get("address", "")
         if not isinstance(address, str) or not address.startswith("0x"):
-            print("ERROR: Invalid window address")
+            log_message("ERROR: Invalid window address")
             return
 
         window_id = address[2:]  # Remove "0x" prefix
 
-        print(f"Applying rule to active window 0x{window_id}: '{window_title}'")
+        log_message(f"Applying rule to active window 0x{window_id}: '{window_title}'")
         success = _apply_window_actions(window_id, temp_rule.width, temp_rule.height, temp_rule.actions)
         if success:
-            print("Rule applied successfully")
+            log_message("Rule applied successfully")
         else:
-            print("Failed to apply rule")
+            log_message("Failed to apply rule")
 
     except Exception as e:
-        print(f"ERROR: Failed to apply rule to active window: {e}")
+        log_message(f"ERROR: Failed to apply rule to active window: {e}")
 
 
-class Command:
+@register("resizer", help="Auto-resize/move clients based on rules", configure_parser=_configure)
+class Command(BaseCommand):
     def __init__(self, args: Namespace) -> None:
-        self.args = args
+        super().__init__(args)
         self.timeout_tracker: dict[str, float] = {}
-        self.window_rules = _load_window_rules()
+        self.window_rules: list[WindowRule] = _load_window_rules()
 
     def _is_rate_limited(self, key: str) -> bool:
         current_time = time.time()
@@ -328,13 +343,8 @@ class Command:
     def _handle_title_event(self, event: str) -> None:
         try:
             # Handle both >> and >>> separators (different Hyprland versions)
-            if ">>>" in event:
-                window_id = event.split(">>>")[1].split(",")[0]
-            else:
-                window_id = event.split(">>")[1].split(",")[0]
-            
-            # Remove any leading > characters
-            window_id = window_id.lstrip(">")
+            separator = ">>>" if ">>>" in event else ">>"
+            window_id = event.split(separator)[1].split(",")[0].lstrip(">")
 
             if not all(c in "0123456789abcdefABCDEF" for c in window_id):
                 log_message(f"ERROR: Invalid window ID format: {window_id}")
@@ -355,13 +365,9 @@ class Command:
     def _handle_open_event(self, event: str) -> None:
         try:
             # Handle both >> and >>> separators
-            if "openwindow>>>" in event:
-                data = event[13:]  # Remove "openwindow>>>"
-            else:
-                data = event[12:]  # Remove "openwindow>>"
-            
-            window_id, workspace, window_class, title = data.split(",", 3)
-            
+            data = event[13:] if "openwindow>>>" in event else event[12:]
+            window_id, _, window_class, title = data.split(",", 3)
+
             # Remove any leading > characters
             window_id = window_id.lstrip(">")
 
@@ -378,13 +384,15 @@ class Command:
         log_message(f"DEBUG: Window 0x{window_id} - Title: '{window_title}' | Initial: '{initial_title}'")
 
         rule = self._match_window_rule(window_title, initial_title)
-        if rule:
-            if self._is_rate_limited(window_id):
-                log_message(f"Rate limited: skipping window 0x{window_id}")
-                return
+        if not rule:
+            return
 
-            log_message(f"Matched rule '{rule.name}' for window 0x{window_id}")
-            _apply_window_actions(window_id, rule.width, rule.height, rule.actions)
+        if self._is_rate_limited(window_id):
+            log_message(f"Rate limited: skipping window 0x{window_id}")
+            return
+
+        log_message(f"Matched rule '{rule.name}' for window 0x{window_id}")
+        _apply_window_actions(window_id, rule.width, rule.height, rule.actions)
 
     def run(self) -> None:
         if self.args.daemon:
@@ -397,7 +405,7 @@ class Command:
         ):
             self._run_active_mode()
         else:
-            print(
+            log_message(
                 "Resizer daemon - use --daemon to start, 'pip' for quick pip mode, or provide pattern, match_type, width, height, and actions for active mode"
             )
 
@@ -414,50 +422,56 @@ class Command:
 
             # Find all windows that match the pattern
             matching_windows = _find_matching_windows(temp_rule)
-            
+
             if not matching_windows:
-                print(f"No windows found matching pattern '{temp_rule.name}' with match type '{temp_rule.match_type}'")
+                log_message(
+                    f"No windows found matching pattern '{temp_rule.name}' with match type '{temp_rule.match_type}'"
+                )
                 return
 
-            print(f"Found {len(matching_windows)} matching window(s)")
-            
+            log_message(f"Found {len(matching_windows)} matching window(s)")
+
             # Apply rule to all matching windows
             success_count = 0
             for window in matching_windows:
                 window_id = window["address"][2:]  # Remove "0x" prefix
                 window_title = window.get("title", "")
-                
-                print(f"Applying rule to window 0x{window_id}: '{window_title}'")
+
+                log_message(f"Applying rule to window 0x{window_id}: '{window_title}'")
                 success = _apply_window_actions(window_id, temp_rule.width, temp_rule.height, temp_rule.actions)
                 if success:
                     success_count += 1
 
-            print(f"Successfully applied rule to {success_count}/{len(matching_windows)} windows")
+            log_message(f"Successfully applied rule to {success_count}/{len(matching_windows)} windows")
 
         except Exception as e:
-            print(f"ERROR: Failed to apply rule: {e}")
+            log_message(f"ERROR: Failed to apply rule: {e}")
 
     def _run_daemon(self) -> None:
         log_message("Hyprland window resizer started")
         log_message(f"Loaded {len(self.window_rules)} window rules")
 
-        socket_path = Path(hypr.socket2_path)
+        _, socket2_path = hypr._socket_paths()
+        socket_path = Path(socket2_path)
         if not socket_path.exists():
             log_message(f"ERROR: Hyprland socket not found at {socket_path}")
             return
 
         try:
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
-                sock.connect(hypr.socket2_path)
+                sock.connect(socket2_path)
 
                 log_message("Connected to Hyprland socket, listening for events...")
 
                 while True:
                     data = sock.recv(4096).decode()
-                    if data:
-                        for line in data.strip().split("\n"):
-                            if line:
-                                self._handle_window_event(line)
+                    if not data:
+                        return
+
+                    for line in data.strip().split("\n"):
+                        if not line:
+                            continue
+                        self._handle_window_event(line)
 
         except KeyboardInterrupt:
             log_message("Resizer daemon stopped")

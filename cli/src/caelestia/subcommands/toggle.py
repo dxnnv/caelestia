@@ -1,15 +1,38 @@
+import contextlib
 import json
 import shlex
 import shutil
-from argparse import Namespace
+from argparse import ArgumentParser
 from collections import ChainMap
-from typing import Any, Callable
+from collections.abc import Callable, Mapping
+from typing import Any, NotRequired, TypedDict, cast
 
+from caelestia.command import BaseCommand, register
 from caelestia.utils import hypr
 from caelestia.utils.paths import user_config_path
 
 
-def is_subset(superset, subset):
+class SpecialWorkspace(TypedDict):
+    name: str
+
+
+class Monitor(TypedDict):
+    focused: bool
+    specialWorkspace: SpecialWorkspace
+
+
+class Workspace(TypedDict):
+    name: str
+
+
+class Client(TypedDict):
+    address: str
+    workspace: Workspace
+    title: NotRequired[str]
+    class_: NotRequired[str]
+
+
+def is_subset(subset: Mapping[str, Any], superset: Mapping[str, Any]) -> bool:
     for key, value in subset.items():
         if key not in superset:
             return False
@@ -29,9 +52,8 @@ def is_subset(superset, subset):
             if not value <= superset[key]:
                 return False
 
-        else:
-            if not value == superset[key]:
-                return False
+        elif value != superset[key]:
+            return False
 
     return True
 
@@ -52,18 +74,30 @@ class DeepChainMap(ChainMap):
 
 
 def specialws() -> None:
-    special = next(m for m in hypr.message("monitors") if m["focused"])["specialWorkspace"]["name"]
+    monitors = cast(list[Monitor], hypr.message("monitors"))
+    special = next(m for m in monitors if m["focused"])["specialWorkspace"]["name"]
     hypr.dispatch("togglespecialworkspace", special[8:] or "special")
 
 
-class Command:
-    args: Namespace
+def _configure(sub: ArgumentParser) -> None:
+    sub.description = "Toggle Caelestia/Hyprland features (e.g., special workspaces)."
+    sub.add_argument(
+        "target",
+        help="Thing to toggle (e.g., communication, notes, music, sysmon, todo, etc.)",
+    )
+    sub.add_argument(
+        "--notify",
+        action="store_true",
+        help="Show a desktop notification on toggle",
+    )
+
+
+@register("toggle", help="Toggle features (e.g., special workspaces)", configure_parser=_configure)
+class Command(BaseCommand):
     cfg: dict[str, dict[str, dict[str, Any]]] | DeepChainMap
-    clients: str | dict[str, Any] = None
+    clients: str | dict[str, Any] | None = None
 
-    def __init__(self, args: Namespace) -> None:
-        self.args = args
-
+    def __init__(self, _) -> None:
         self.cfg = {
             "communication": {
                 "discord": {
@@ -107,10 +141,8 @@ class Command:
                 },
             },
         }
-        try:
+        with contextlib.suppress(FileNotFoundError, json.JSONDecodeError, KeyError):
             self.cfg = DeepChainMap(json.loads(user_config_path.read_text())["toggles"], self.cfg)
-        except (FileNotFoundError, json.JSONDecodeError, KeyError):
-            pass
 
     def run(self) -> None:
         if self.args.workspace == "specialws":
@@ -126,16 +158,16 @@ class Command:
         if not spawned:
             hypr.dispatch("togglespecialworkspace", self.args.workspace)
 
-    def get_clients(self) -> str | dict[str, Any]:
-        if self.clients is None:
-            self.clients = hypr.message("clients")
+    def get_clients(self) -> list[Client]:
+        return cast(list[Client], hypr.message("clients"))
 
-        return self.clients
-
-    def move_client(self, selector: Callable, workspace: str) -> None:
+    def move_client(self, selector: Callable[[Client], bool], workspace: str) -> None:
         for client in self.get_clients():
             if selector(client) and client["workspace"]["name"] != f"special:{workspace}":
-                hypr.dispatch("movetoworkspacesilent", f"special:{workspace},address:{client['address']}")
+                hypr.dispatch(
+                    "movetoworkspacesilent",
+                    f"special:{workspace},address:{client['address']}",
+                )
 
     def spawn_client(self, selector: Callable, spawn: list[str]) -> bool:
         if (spawn[0].endswith(".desktop") or shutil.which(spawn[0])) and not any(
@@ -146,17 +178,14 @@ class Command:
         return False
 
     def handle_client_config(self, client: dict[str, Any]) -> bool:
-        def selector(c: dict[str, Any]) -> bool:
+        def selector(c: Client) -> bool:
             # Each match is or, inside matches is and
-            for match in client["match"]:
-                if is_subset(c, match):
-                    return True
-            return False
+            return any(is_subset(c, match) for match in client["match"])
 
         spawned = False
-        if "command" in client and client["command"]:
+        if client.get("command"):
             spawned = self.spawn_client(selector, client["command"])
-        if "move" in client and client["move"]:
+        if client.get("move"):
             self.move_client(selector, self.args.workspace)
 
         return spawned

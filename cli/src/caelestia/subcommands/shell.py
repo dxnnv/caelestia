@@ -1,15 +1,18 @@
 import os
-import subprocess
-from argparse import Namespace
+from argparse import REMAINDER, ArgumentParser
 from pathlib import Path
 
+import caelestia.utils.runner as runner
+from caelestia.command import BaseCommand, register
 
-class Command:
-    args: Namespace
 
-    def __init__(self, args: Namespace) -> None:
-        self.args = args
+def _configure(sub: ArgumentParser) -> None:
+    sub.add_argument("--print-env", action="store_true", help="Print QML2_IMPORT_PATH and exit")
+    sub.add_argument("cmd", nargs=REMAINDER, help="Command to run with QML env (use `--` to separate)")
 
+
+@register("shell", help="Run/show IPC calls", configure_parser=_configure)
+class Command(BaseCommand):
     def run(self) -> None:
         output = "Nothing to do. Try: message | -s(how)"
         if self.args.show:
@@ -19,7 +22,7 @@ class Command:
         print(output, end="")
 
     def shell(self, *args: str) -> str:
-        return subprocess.check_output(
+        return runner.check(
             ["qs", "-c", "caelestia", *args],
             text=True,
             env=self._env_with_qml(),

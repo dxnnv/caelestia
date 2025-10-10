@@ -1,15 +1,16 @@
 import subprocess
-from argparse import Namespace
+from argparse import ArgumentParser
 from datetime import datetime
 
+import caelestia.utils.runner as runner
+from caelestia.command import BaseCommand, register
 from caelestia.utils.notify import notify
 from caelestia.utils.paths import screenshots_cache_dir, screenshots_dir
 
 
 def fullscreen() -> None:
-    sc_data = subprocess.check_output(["grim", "-"])
-
-    subprocess.run(["wl-copy"], input=sc_data)
+    sc_data = runner.check_bytes(["grim", "-"])
+    subprocess.run(["wl-copy"], input=sc_data, check=True)
 
     dest = screenshots_cache_dir / datetime.now().strftime("%Y%m%d%H%M%S")
     screenshots_cache_dir.mkdir(exist_ok=True, parents=True)
@@ -35,12 +36,16 @@ def fullscreen() -> None:
         notify("Screenshot saved", f"Saved to {new_dest}")
 
 
-class Command:
-    args: Namespace
+def _configure(sub: ArgumentParser) -> None:
+    mode = sub.add_mutually_exclusive_group()
+    mode.add_argument("--fullscreen", action="store_true", help="Capture entire screen")
+    mode.add_argument("--region", metavar="WxH+X+Y", help="Capture a region")
+    sub.add_argument("--edit", action="store_true", help="Open in swappy for annotation")
+    sub.add_argument("--no-copy", action="store_true", help="Do not copy to clipboard")
 
-    def __init__(self, args: Namespace) -> None:
-        self.args = args
 
+@register("screenshot", help="Capture screenshots", configure_parser=_configure)
+class Command(BaseCommand):
     def run(self) -> None:
         if self.args.region:
             self.region()
@@ -53,7 +58,7 @@ class Command:
                 ["qs", "-c", "caelestia", "ipc", "call", "picker", "openFreeze" if self.args.freeze else "open"]
             )
         else:
-            sc_data = subprocess.check_output(["grim", "-l", "0", "-g", self.args.region.strip(), "-"])
+            sc_data: bytes = runner.check_bytes(["grim", "-l", "0", "-g", self.args.region.strip(), "-"])
             swappy = subprocess.Popen(["swappy", "-f", "-"], stdin=subprocess.PIPE, start_new_session=True)
             if swappy.stdin is not None:
                 swappy.stdin.write(sc_data)

@@ -1,24 +1,39 @@
 import json
-import subprocess
-from argparse import Namespace
+from argparse import ArgumentParser
 from urllib.request import urlopen
 
+import caelestia.utils.runner as runner
+from caelestia.command import BaseCommand, register
 from caelestia.utils.paths import cli_data_dir
 
 
-class Command:
-    args: Namespace
+def _configure(sub: ArgumentParser) -> None:
+    sub.description = "Browse or update emoji and Nerd Font glyph data."
+    mode = sub.add_mutually_exclusive_group()
+    mode.add_argument(
+        "--picker",
+        action="store_true",
+        help="Open an emoji picker using fuzzel and copy selection to clipboard.",
+    )
+    mode.add_argument(
+        "--fetch",
+        action="store_true",
+        help="Fetch and rebuild the emoji/glyph database (requires internet).",
+    )
+    sub.add_argument(
+        "--print-path",
+        action="store_true",
+        help="Print the path to emojis.txt and exit.",
+    )
 
-    def __init__(self, args: Namespace) -> None:
-        self.args = args
 
+@register("emoji", help="Display, pick, or fetch emoji data", configure_parser=_configure)
+class Command(BaseCommand):
     def run(self) -> None:
         if self.args.picker:
             emojis = (cli_data_dir / "emojis.txt").read_text()
-            chosen = subprocess.check_output(
-                ["fuzzel", "--dmenu", "--placeholder=Type to search emojis"], input=emojis, text=True
-            )
-            subprocess.run(["wl-copy"], input=chosen.split()[0], text=True)
+            chosen = runner.check(["fuzzel", "--dmenu", "--placeholder=Type to search emojis"], input=emojis, text=True)
+            runner.run(["wl-copy"], input=chosen.split()[0], text=True)
         elif self.args.fetch:
             self.fetch_emojis()
         else:
