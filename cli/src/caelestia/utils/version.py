@@ -1,6 +1,7 @@
 import shutil
 import subprocess
 
+import caelestia.utils.runner as runner
 from caelestia.utils.paths import config_dir
 
 
@@ -22,7 +23,7 @@ def print_version() -> None:
     print()
     try:
         caelestia_dir = (config_dir / "hypr").resolve().parent
-        caelestia_ver = subprocess.check_output(
+        caelestia_ver = runner.check(
             ["git", "--git-dir", caelestia_dir / ".git", "rev-list", "--format=%B", "--max-count=1", "HEAD"], text=True
         )
         print("Caelestia:")
@@ -33,7 +34,7 @@ def print_version() -> None:
 
     print()
     try:
-        shell_ver = subprocess.check_output(["/usr/lib/caelestia/version", "-s"], text=True).strip()
+        shell_ver = runner.check(["/usr/lib/caelestia/version", "-s"], text=True).strip()
         print("Shell:")
         print("    ", shell_ver)
     except FileNotFoundError:
@@ -42,7 +43,7 @@ def print_version() -> None:
     print()
     if shutil.which("qs"):
         print("Quickshell:")
-        print("   ", subprocess.check_output(["qs", "--version"], text=True).strip())
+        print("   ", runner.check(["qs", "--version"], text=True).strip())
     else:
         print("Quickshell: not in PATH")
 
@@ -51,7 +52,7 @@ def print_version() -> None:
         print("\nLocal copy of shell found:")
 
         try:
-            shell_ver = subprocess.check_output(
+            shell_ver = runner.check(
                 [
                     "git",
                     "--git-dir",
@@ -69,7 +70,7 @@ def print_version() -> None:
         except subprocess.CalledProcessError:
             print("    Unable to determine last merged upstream commit.")
 
-        shell_ver = subprocess.check_output(
+        shell_ver = runner.check(
             ["git", "--git-dir", local_shell_dir / ".git", "rev-list", "--format=%B", "--max-count=1", "HEAD"],
             text=True,
         )

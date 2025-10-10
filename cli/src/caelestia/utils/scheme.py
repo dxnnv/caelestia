@@ -169,23 +169,25 @@ class Scheme:
         if self._mode not in modes:
             self._mode = modes[0]
 
+    noWallpaperError: str = (
+        "No wallpaper set. Please set a wallpaper via `caelestia wallpaper` before setting a dynamic scheme."
+    )
+
     def _update_colours(self) -> None:
         if self.name == "dynamic":
             from caelestia.utils.material import get_colours_for_image
 
             try:
                 self._colours = get_colours_for_image()
-            except FileNotFoundError:
+            except FileNotFoundError as e:
                 if self.notify:
                     notify(
                         "-u",
                         "critical",
                         "Unable to set dynamic scheme",
-                        "No wallpaper set. Please set a wallpaper via `caelestia wallpaper` before setting a dynamic scheme.",
+                        self.noWallpaperError,
                     )
-                raise ValueError(
-                    "No wallpaper set. Please set a wallpaper via `caelestia wallpaper` before setting a dynamic scheme."
-                )
+                raise ValueError(self.noWallpaperError) from e
         else:
             self._colours = self.read_colours_from_file(self.get_colours_path())
 
@@ -230,7 +232,7 @@ def get_scheme() -> Scheme:
         try:
             scheme_json = json.loads(scheme_path.read_text())
             scheme = Scheme(scheme_json)
-        except (IOError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError):
             scheme = Scheme(None)
             scheme.save()
 

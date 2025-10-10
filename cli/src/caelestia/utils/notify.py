@@ -1,11 +1,21 @@
+import shutil
 import subprocess
+
+from caelestia.utils.runner import check
+
+
+def _has(cmd: str) -> bool:
+    return shutil.which(cmd) is not None
 
 
 def notify(*args: str) -> str:
-    return subprocess.check_output(["notify-send", "-a", "caelestia-cli", *args], text=True).strip()
+    return check(["notify-send", "-a", "caelestia-cli", *args], text=True).strip()
 
 
 def close_notification(identifier: str) -> None:
+    if not identifier or not _has("gdbus"):
+        return
+
     subprocess.run(
         [
             "gdbus",
@@ -16,5 +26,7 @@ def close_notification(identifier: str) -> None:
             "--method=org.freedesktop.Notifications.CloseNotification",
             identifier,
         ],
+        check=False,
         stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
     )

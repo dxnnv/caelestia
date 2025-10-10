@@ -1,8 +1,10 @@
+import contextlib
 import json
 import re
 import subprocess
 from pathlib import Path
 
+import caelestia.utils.runner as runner
 from caelestia.utils.colour import get_dynamic_colours
 from caelestia.utils.logging import log_exception
 from caelestia.utils.paths import (
@@ -32,12 +34,9 @@ def gen_scss(colours: dict[str, str]) -> str:
 
 def gen_replace(colours: dict[str, str], template: Path, _hash: bool = False) -> str:
     text = template.read_text()
-
     for name, colour in colours.items():
-        pattern = re.compile(r"\{\{\s*\$" + re.escape(name) + r"\s*\}\}")
-        repl = f"#{colour}" if _hash else colour
-        text = pattern.sub(repl, text)
-
+        pattern = r"\{\{\s*\$" + re.escape(name) + r"\s*\}\}"
+        text = re.sub(pattern, ("#" if _hash else "") + colour, text)
     return text
 
 
@@ -135,7 +134,7 @@ def apply_discord(scss: str) -> None:
 
     with tempfile.TemporaryDirectory("w") as tmp_dir:
         (Path(tmp_dir) / "_colours.scss").write_text(scss)
-        conf = subprocess.check_output(["sass", "-I", tmp_dir, templates_dir / "discord.scss"], text=True)
+        conf = runner.check(["sass", "-I", tmp_dir, templates_dir / "discord.scss"], text=True)
 
     for client in ("Equicord", "Vencord", "BetterDiscord", "equibop", "vesktop", "legcord"):
         client_dir = config_dir / client / "themes"
@@ -289,10 +288,8 @@ def run_fastfetch(colours: dict[str, str]) -> None:
         "--logo-color-4",
         hexc("onSurface"),
     ]
-    try:
+    with contextlib.suppress(FileNotFoundError):
         subprocess.run(args, check=False)
-    except FileNotFoundError:
-        pass
 
 
 def apply_colours(colours: dict[str, str], mode: str) -> None:
@@ -302,7 +299,7 @@ def apply_colours(colours: dict[str, str], mode: str) -> None:
         cfg = {}
 
     def check(key: str) -> bool:
-        return cfg[key] if key in cfg else True
+        return cfg.get(key, True)
 
     if check("enableTerm"):
         apply_terms(gen_sequences(colours))
