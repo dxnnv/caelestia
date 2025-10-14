@@ -5,6 +5,8 @@ import qs.config
 import Quickshell
 import Quickshell.Io
 import Quickshell.Services.Mpris
+import QtQml
+import Caelestia
 
 Singleton {
     id: root
@@ -16,6 +18,16 @@ Singleton {
     function getIdentity(player: MprisPlayer): string {
         const alias = Config.services.playerAliases.find(a => a.from === player.identity);
         return alias?.to ?? player.identity;
+    }
+
+    Connections {
+        target: root.active
+
+        function onPostTrackChanged() {
+            if (Config.utilities.toasts.nowPlaying && root.active.trackArtist != "" && root.active.trackTitle != "") {
+                Toaster.toast(qsTr("Now Playing"), qsTr("%1 - %2").arg(root.active.trackArtist).arg(root.active.trackTitle), "music_note");
+            }
+        }
     }
 
     PersistentProperties {
