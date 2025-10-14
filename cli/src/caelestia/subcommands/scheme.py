@@ -18,7 +18,7 @@ def _configure(sub: ArgumentParser) -> None:
     """
     scheme {get|set|list}
     """
-    sub.description = "Manage Caelestia color schemes."
+    sub.description = "Manage Caelestia color schemes"
     actions = sub.add_subparsers(dest="action", required=True)
 
     # scheme get [--json]

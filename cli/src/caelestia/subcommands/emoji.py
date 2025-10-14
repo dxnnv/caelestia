@@ -8,7 +8,7 @@ from caelestia.utils.paths import cli_data_dir
 
 
 def _configure(sub: ArgumentParser) -> None:
-    sub.description = "Browse or update emoji and Nerd Font glyph data."
+    sub.description = "Browse or update emoji and Nerd Font glyph data"
     mode = sub.add_mutually_exclusive_group()
     mode.add_argument(
         "--picker",
