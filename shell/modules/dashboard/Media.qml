@@ -196,7 +196,7 @@ Item {
 
             animate: true
             horizontalAlignment: Text.AlignHCenter
-            text: (Players.active?.trackArtist ?? qsTr("Play some music for stuff to show up here!")) || qsTr("Unknown artist")
+            text: (Players.active?.trackArtist ?? qsTr("*crickets*")) || qsTr("Unknown artist")
             color: Players.active ? Colours.palette.m3secondary : Colours.palette.m3outline
             elide: Text.ElideRight
             wrapMode: Players.active ? Text.NoWrap : Text.WordWrap
@@ -323,7 +323,14 @@ Item {
                 id: playerSelector
 
                 disabled: !Players.list.length
-                active: menuItems.find(m => m.modelData === Players.active) ?? menuItems[0]
+                active: (function () {
+                        const items = menuItems || [];
+                        if (!items.length)
+                            return null;
+
+                        const idx = items.findIndex(it => it && it.modelData === Players.active);
+                        return items[idx >= 0 ? idx : 0] ?? null;
+                    })()
                 menu.onItemSelected: item => Players.manualActive = item.modelData
 
                 menuItems: playerList.instances

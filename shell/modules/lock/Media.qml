@@ -83,7 +83,7 @@ Item {
         StyledText {
             Layout.fillWidth: true
             animate: true
-            text: Players.active?.trackArtist ?? qsTr("No media")
+            text: Players.active?.trackTitle ?? qsTr("No media")
             color: Colours.palette.m3primary
             horizontalAlignment: Text.AlignHCenter
             font.pointSize: Appearance.font.size.large
@@ -95,7 +95,7 @@ Item {
         StyledText {
             Layout.fillWidth: true
             animate: true
-            text: Players.active?.trackTitle ?? qsTr("No media")
+            text: Players.active?.trackArtist ?? qsTr("*crickets*")
             horizontalAlignment: Text.AlignHCenter
             font.pointSize: Appearance.font.size.larger
             font.family: Appearance.font.family.mono
