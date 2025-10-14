@@ -16,7 +16,7 @@ Item {
 
     required property Props props
     required property var visibilities
-    readonly property int notifCount: Notifs.list.reduce((acc, n) => n.closed ? acc : acc + 1, 0)
+    readonly property int notifCount: Notifs.swayncCount
 
     anchors.fill: parent
     anchors.margins: Appearance.padding.normal

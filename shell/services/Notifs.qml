@@ -7,101 +7,31 @@ import qs.utils
 import Caelestia
 import Quickshell
 import Quickshell.Io
+import Quickshell.Io as QsIo
 import Quickshell.Services.Notifications
 import QtQuick
 
 Singleton {
     id: root
 
-    property list<Notif> list: []
-    readonly property list<Notif> notClosed: list.filter(n => !n.closed)
-    readonly property list<Notif> popups: list.filter(n => n.popup)
-    property alias dnd: props.dnd
+    // --- SwayNC integration ---
+    property bool swayncDnd: false
+    property int swayncCount: 0
+
+    property var list: []
+    readonly property var notClosed: list.filter(n => !n.closed)
+    readonly property var popups: list.filter(n => n.popup)
 
     property bool loaded
 
-    onDndChanged: {
+    // --- DND Toggle Toasts ---
+    onSwayncDndChanged: {
         if (!Config.utilities.toasts.dndChanged)
             return;
-
-        if (dnd)
+        if (swayncDnd)
             Toaster.toast(qsTr("Do not disturb enabled"), qsTr("Popup notifications are now disabled"), "do_not_disturb_on");
         else
             Toaster.toast(qsTr("Do not disturb disabled"), qsTr("Popup notifications are now enabled"), "do_not_disturb_off");
-    }
-
-    onListChanged: {
-        if (loaded)
-            saveTimer.restart();
-    }
-
-    Timer {
-        id: saveTimer
-
-        interval: 1000
-        onTriggered: storage.setText(JSON.stringify(root.notClosed.map(n => ({
-                    time: n.time,
-                    id: n.id,
-                    summary: n.summary,
-                    body: n.body,
-                    appIcon: n.appIcon,
-                    appName: n.appName,
-                    image: n.image,
-                    expireTimeout: n.expireTimeout,
-                    urgency: n.urgency,
-                    resident: n.resident,
-                    hasActionIcons: n.hasActionIcons,
-                    actions: n.actions
-                }))))
-    }
-
-    PersistentProperties {
-        id: props
-
-        property bool dnd
-
-        reloadableId: "notifs"
-    }
-
-    NotificationServer {
-        id: server
-
-        keepOnReload: false
-        actionsSupported: true
-        bodyHyperlinksSupported: true
-        bodyImagesSupported: true
-        bodyMarkupSupported: true
-        imageSupported: true
-        persistenceSupported: true
-
-        onNotification: notif => {
-            notif.tracked = true;
-
-            const comp = notifComp.createObject(root, {
-                popup: !props.dnd && ![...Visibilities.screens.values()].some(v => v.sidebar),
-                notification: notif
-            });
-            root.list = [comp, ...root.list];
-        }
-    }
-
-    FileView {
-        id: storage
-
-        path: `${Paths.state}/notifs.json`
-        onLoaded: {
-            const data = JSON.parse(text());
-            for (const notif of data)
-                root.list.push(notifComp.createObject(root, notif));
-            root.list.sort((a, b) => b.time - a.time);
-            root.loaded = true;
-        }
-        onLoadFailed: err => {
-            if (err === FileViewError.FileNotFound) {
-                root.loaded = true;
-                setText("[]");
-            }
-        }
     }
 
     CustomShortcut {
@@ -122,19 +52,131 @@ Singleton {
         }
 
         function isDndEnabled(): bool {
-            return props.dnd;
+            return root.swayncDnd;
         }
-
         function toggleDnd(): void {
-            props.dnd = !props.dnd;
+            root.setDnd(!root.swayncDnd);
         }
-
         function enableDnd(): void {
-            props.dnd = true;
+            root.setDnd(true);
         }
-
         function disableDnd(): void {
-            props.dnd = false;
+            root.setDnd(false);
+        }
+    }
+
+    // --- SwayNC controls ---
+    function refreshDnd() {
+        dndProc.exec(["swaync-client", "--get-dnd"]);
+    }
+    function setDnd(on) {
+        runProc(["swaync-client", on ? "--dnd-on" : "--dnd-off"]);
+        swayncDnd = !!on;
+    }
+    function refreshCount() {
+        cntProc.exec(["swaync-client", "--count"]);
+    }
+    function openCenter() {
+        runProc(["swaync-client", "--open-panel"]);
+    }
+    function toggleCenter() {
+        runProc(["swaync-client", "--toggle-panel"]);
+    }
+
+    function runProc(args) {
+        Qt.createQmlObject('import Quickshell.Io; Process { }', root).exec(args);
+    }
+
+    Timer {
+        interval: 2000
+        running: true
+        repeat: true
+        onTriggered: root.refreshCount()
+    }
+
+    Component.onCompleted: {
+        refreshDnd();
+        refreshCount();
+    }
+
+    QsIo.Process {
+        id: dndProc
+    }
+    Connections {
+        target: dndProc.stdout
+        function onRead(data) {
+            const s = (data || "").trim();
+            if (s === "true" || s === "false")
+                root.swayncDnd = (s === "true");
+        }
+    }
+
+    QsIo.Process {
+        id: cntProc
+    }
+    Connections {
+        target: cntProc.stdout
+        function onRead(data) {
+            const n = parseInt((data || "").trim());
+            if (!Number.isNaN(n))
+                root.swayncCount = n;
+        }
+    }
+
+    QsIo.Process {
+        id: tap
+        command: ["python3", Qt.resolvedUrl("notif_listen.py")]
+        running: true
+        property string _buf: ""
+        onExited: (code, status) => {
+            tap.running = true;
+        }
+    }
+    Connections {
+        target: tap.stdout
+        function onRead(chunk) {
+            if (!chunk)
+                return;
+            tap._buf += chunk;
+            const parts = tap._buf.split("\n");
+            tap._buf = parts.pop();
+            for (const line of parts) {
+                const s = line.trim();
+                if (!s)
+                    continue;
+                let n;
+                try {
+                    n = JSON.parse(s);
+                } catch (_) {
+                    continue;
+                }
+                const arr = Array.isArray(n.actions) ? n.actions : [];
+                const actions = [];
+                for (let i = 0; i + 1 < arr.length; i += 2) {
+                    const id = arr[i], text = arr[i + 1];
+                    actions.push({
+                        identifier: id,
+                        text,
+                        invoke: () => runProc(["swaync-client", "--action"])
+                    });
+                }
+                const comp = notifComp.createObject(root, {
+                    popup: !root.swayncDnd && ![...Visibilities.screens.values()].some(v => v.sidebar),
+                    time: new Date(),
+                    id: Math.floor(Math.random() * 2147483647).toString(),
+                    summary: n.summary,
+                    body: n.body,
+                    appIcon: n.appIcon,
+                    appName: n.appName,
+                    image: "",
+                    expireTimeout: (n.expireTimeout > 0 ? n.expireTimeout : Config.notifs.defaultExpireTimeout),
+                    urgency: NotificationUrgency.Normal,
+                    resident: false,
+                    hasActionIcons: actions.length > 0,
+                    actions
+                });
+                root.list = [comp, ...root.list];
+            }
         }
     }
 
@@ -149,13 +191,10 @@ Singleton {
         readonly property string timeStr: {
             const diff = Time.date.getTime() - time.getTime();
             const m = Math.floor(diff / 60000);
-
             if (m < 1)
                 return qsTr("now");
-
             const h = Math.floor(m / 60);
             const d = Math.floor(h / 24);
-
             if (d > 0)
                 return `${d}d`;
             if (h > 0)
@@ -187,13 +226,11 @@ Singleton {
 
         readonly property LazyLoader dummyImageLoader: LazyLoader {
             active: false
-
             PanelWindow {
                 implicitWidth: Config.notifs.sizes.image
                 implicitHeight: Config.notifs.sizes.image
                 color: "transparent"
                 mask: Region {}
-
                 Image {
                     anchors.fill: parent
                     source: Qt.resolvedUrl(notif.image)
@@ -201,11 +238,9 @@ Singleton {
                     cache: false
                     asynchronous: true
                     opacity: 0
-
                     onStatusChanged: {
                         if (status !== Image.Ready)
                             return;
-
                         const cacheKey = notif.appName + notif.summary + notif.id;
                         let h1 = 0xdeadbeef, h2 = 0x41c6ce57, ch;
                         for (let i = 0; i < cacheKey.length; i++) {
@@ -218,7 +253,6 @@ Singleton {
                         h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507);
                         h2 ^= Math.imul(h1 ^ (h1 >>> 13), 3266489909);
                         const hash = (h2 >>> 0).toString(16).padStart(8, 0) + (h1 >>> 0).toString(16).padStart(8, 0);
-
                         const cache = `${Paths.notifimagecache}/${hash}.png`;
                         CUtils.saveItem(this, Qt.resolvedUrl(cache), () => {
                             notif.image = cache;
@@ -231,49 +265,38 @@ Singleton {
 
         readonly property Connections conn: Connections {
             target: notif.notification
-
             function onClosed(): void {
                 notif.close();
             }
-
             function onSummaryChanged(): void {
                 notif.summary = notif.notification.summary;
             }
-
             function onBodyChanged(): void {
                 notif.body = notif.notification.body;
             }
-
             function onAppIconChanged(): void {
                 notif.appIcon = notif.notification.appIcon;
             }
-
             function onAppNameChanged(): void {
                 notif.appName = notif.notification.appName;
             }
-
             function onImageChanged(): void {
                 notif.image = notif.notification.image;
                 if (notif.notification?.image)
                     notif.dummyImageLoader.active = true;
             }
-
             function onExpireTimeoutChanged(): void {
                 notif.expireTimeout = notif.notification.expireTimeout;
             }
-
             function onUrgencyChanged(): void {
                 notif.urgency = notif.notification.urgency;
             }
-
             function onResidentChanged(): void {
                 notif.resident = notif.notification.resident;
             }
-
             function onHasActionIconsChanged(): void {
                 notif.hasActionIcons = notif.notification.hasActionIcons;
             }
-
             function onActionsChanged(): void {
                 notif.actions = notif.notification.actions.map(a => ({
                             identifier: a.identifier,
@@ -286,13 +309,11 @@ Singleton {
         function lock(item: Item): void {
             locks.add(item);
         }
-
         function unlock(item: Item): void {
             locks.delete(item);
             if (closed)
                 close();
         }
-
         function close(): void {
             closed = true;
             if (locks.size === 0 && root.list.includes(this)) {
@@ -305,7 +326,6 @@ Singleton {
         Component.onCompleted: {
             if (!notification)
                 return;
-
             id = notification.id;
             summary = notification.summary;
             body = notification.body;
@@ -328,7 +348,6 @@ Singleton {
 
     Component {
         id: notifComp
-
         Notif {}
     }
 }
