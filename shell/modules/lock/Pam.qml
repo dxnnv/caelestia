@@ -8,8 +8,9 @@ import QtQuick
 Scope {
     id: root
 
-    required property WlSessionLock lock
+    property string charList: " abcdefghijklmnopqrstuvwxyz1234567890`~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/?"
 
+    required property WlSessionLock lock
     readonly property alias passwd: passwd
     readonly property alias fprint: fprint
     property string lockMessage
@@ -25,16 +26,16 @@ Scope {
 
         if (event.key === Qt.Key_Enter || event.key === Qt.Key_Return) {
             passwd.start();
-        } else if (event.key === Qt.Key_Backspace) {
-            if (event.modifiers & Qt.ControlModifier) {
-                buffer = "";
-            } else {
-                buffer = buffer.slice(0, -1);
-            }
-        } else if (" abcdefghijklmnopqrstuvwxyz1234567890`~!@#$%^&*()-_=+[{]}\\|;:'\",<.>/?".includes(event.text.toLowerCase())) {
-            // No illegal characters (you are insane if you use unicode in your password)
-            buffer += event.text;
+            return;
         }
+
+        if (event.key === Qt.Key_Backspace) {
+            buffer = event.modifiers & Qt.ControlModifier ? "" : buffer.slice(0, -1);
+            return;
+        }
+
+        if (charList.includes(event.text.toLowerCase()))
+            buffer += event.text;
     }
 
     PamContext {
@@ -59,15 +60,16 @@ Scope {
         }
 
         onCompleted: res => {
-            if (res === PamResult.Success)
+            switch (res) {
+            case PamResult.Success:
                 return root.lock.unlock();
-
-            if (res === PamResult.Error)
+            case PamResult.Error:
                 root.state = "error";
-            else if (res === PamResult.MaxTries)
+            case PamResult.MaxTries:
                 root.state = "max";
-            else if (res === PamResult.Failed)
+            case PamResult.Failed:
                 root.state = "fail";
+            }
 
             root.flashMsg();
             stateReset.restart();
