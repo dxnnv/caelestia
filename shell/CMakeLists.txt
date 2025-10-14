@@ -56,8 +56,8 @@ qt_policy(SET QTP0001 NEW)
 qt_policy(SET QTP0004 OLD)
 
 # ---- Install destinations (per-user by default; override with -D)
-set(DISTRIBUTOR "Unset" CACHE STRING "Distributor")
-set(ENABLE_MODULES "plugin;shell" CACHE STRING "Modules to build/install")
+set(DISTRIBUTOR "Local" CACHE STRING "Distributor")
+set(ENABLE_MODULES "plugin;shell;extras" CACHE STRING "Modules to build/install")
 
 # Per-user defaults; you can still pass system paths explicitly if you want
 set(INSTALL_LIBDIR    "$ENV{HOME}/.local/lib/caelestia"        CACHE STRING "Library install dir")

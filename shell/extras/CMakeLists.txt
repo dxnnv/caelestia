@@ -1,4 +1,6 @@
 # Version
+include(GNUInstallDirs)
+
 add_executable(version version.cpp)
 target_compile_definitions(version PRIVATE
     PROJECT_NAME="${PROJECT_NAME}"
@@ -13,4 +15,4 @@ set_target_properties(version PROPERTIES
   AUTORCC OFF
 )
 
-install(TARGETS version DESTINATION ${INSTALL_BINDIR})
+install(TARGETS version RUNTIME DESTINATION ${CMAKE_INSTALL_LIBDIR}/caelestia)
