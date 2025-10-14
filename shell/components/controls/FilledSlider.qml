@@ -12,6 +12,9 @@ Slider {
     property real oldValue
     property bool initialized
 
+    signal iconTapped
+    property bool enableIconTap: false
+
     orientation: Qt.Vertical
 
     background: StyledRect {
@@ -109,6 +112,13 @@ Slider {
                         duration: Appearance.anim.durations.normal / 2
                         easing.bezierCurve: Appearance.anim.curves.standardDecel
                     }
+                }
+
+                TapHandler {
+                    acceptedButtons: Qt.LeftButton
+                    gesturePolicy: TapHandler.DragThreshold
+                    onTapped: root.iconTapped()
+                    grabPermissions: PointerHandler.TakeOverForbidden
                 }
             }
         }
