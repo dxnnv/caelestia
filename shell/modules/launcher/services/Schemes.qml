@@ -67,7 +67,10 @@ Searcher {
         command: ["caelestia", "scheme", "get", "-nfv"]
         stdout: StdioCollector {
             onStreamFinished: {
-                const [name, flavour, variant] = text.trim().split("\n");
+                const parts = text.trim().split("\n").filter(p => p.length);
+                const name = parts[0] || "";
+                const flavour = parts[1] || "";
+                const variant = parts[2] || "";
                 root.currentScheme = `${name} ${flavour}`;
                 root.currentVariant = variant;
             }
@@ -76,9 +79,9 @@ Searcher {
 
     component Scheme: QtObject {
         required property var modelData
-        readonly property string name: modelData.name
-        readonly property string flavour: modelData.flavour
-        readonly property var colours: modelData.colours
+        readonly property string name: (modelData && modelData.name) || ""
+        readonly property string flavour: (modelData && modelData.flavour) || ""
+        readonly property var colours: (modelData && modelData.colours) || ({})
 
         function onClicked(list: AppList): void {
             list.visibilities.launcher = false;
