@@ -116,11 +116,9 @@ def apply_terms(sequences: str) -> None:
     pts_path = Path("/dev/pts")
     for pt in pts_path.iterdir():
         if pt.name.isdigit():
-            try:
+            with contextlib.suppress(PermissionError):
                 with pt.open("a") as f:
                     f.write(sequences)
-            except PermissionError:
-                pass
 
 
 @log_exception
@@ -234,7 +232,7 @@ def apply_kitty(colours: dict[str, str]) -> None:
     theme_path = config_dir / "kitty/themes/caelestia.conf"
     write_file(theme_path, theme_text)
 
-    try:
+    with contextlib.suppress(FileNotFoundError):
         subprocess.run(
             ["kitty", "@", "set-colors", "--all", "--configured", str(theme_path)],
             stdout=subprocess.DEVNULL,
@@ -247,8 +245,57 @@ def apply_kitty(colours: dict[str, str]) -> None:
             stderr=subprocess.DEVNULL,
             check=False,
         )
-    except FileNotFoundError:
-        pass
+
+
+@log_exception
+def apply_swaync(colours: dict[str, str]) -> None:
+    with contextlib.suppress(FileNotFoundError):
+        css = gen_replace(colours, templates_dir / "swaync.css", _hash=True)
+        write_file(config_dir / "swaync/style.css", css)
+        subprocess.run(["swaync-client", "--reload-css"], check=False)
+
+    def define(name: str, hexval: str) -> str:
+        return f"@define-color {name} #{hexval};\n"
+
+    lines: list[str] = []
+    for key, hexval in colours.items():
+        keb = re.sub(r"(?<!^)([A-Z])", r"-\1", key).replace("_", "-").lower()
+        und = keb.replace("-", "_")
+        lines.append(define(keb, hexval))
+        if und != keb:
+            lines.append(define(und, hexval))
+
+    alias_map = {
+        "blur_background": "surface-dim",
+        "groupbackground": "surface-dim",
+        "buttoncolor": "primary",
+        "bordercolor": "inverse-primary",
+        "fontcolor": "on-surface",
+        "source_color": "primary",
+        "background": "surface",
+        "on_background": "on-surface",
+        "on_secondary": "on-secondary",
+        "primary_fixed_dim": "primary-fixed-dim",
+        "primary_fixed": "primary-fixed",
+        "on_primary": "on-primary",
+        "inverse_primary": "inverse-primary",
+        "on_surface_variant": "on-surface-variant",
+        "scrim": "scrim",
+    }
+
+    for alias, target in alias_map.items():
+        lines.append(f"@define-color {alias} @{target};\n")
+
+    colors_css = "".join(lines)
+    write_file(config_dir / "swaync/colors.css", colors_css)
+
+    with contextlib.suppress(FileNotFoundError):
+        css = gen_replace(colours, templates_dir / "swaync.css", _hash=True)
+        write_file(config_dir / "swaync/style.css", css)
+
+    with contextlib.suppress(FileNotFoundError):
+        subprocess.run(["swaync-client", "--reload-config"], check=False)
+        subprocess.run(["swaync-client", "--reload-css"], check=False)
 
 
 @log_exception
@@ -327,5 +374,7 @@ def apply_colours(colours: dict[str, str], mode: str) -> None:
         apply_cava(colours)
     if check("enableKitty"):
         apply_kitty(colours)
+    if check("enableSwayNC"):
+        apply_swaync(colours)
     run_fastfetch(colours)
     apply_user_templates(colours)

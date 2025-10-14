@@ -25,19 +25,30 @@ def _configure(sub: ArgumentParser) -> None:
     get_p = actions.add_parser("get", help="Show the current scheme")
     get_p.add_argument("--json", action="store_true", help="Output as JSON")
 
-    # scheme set (--name NAME | --random) [--flavour FLAV] [--mode auto|light|dark]
+    # scheme set (--name NAME | --random) [--flavour FLAV] [--mode auto|light|dark] [--variant VAR] [--notify]
     set_p = actions.add_parser("set", help="Set the active scheme")
     grp = set_p.add_mutually_exclusive_group(required=True)
     grp.add_argument("--name", help="Scheme name to apply")
     grp.add_argument("--random", action="store_true", help="Pick a random scheme")
     set_p.add_argument("--flavour", help="Flavour/variant (if the scheme has variants)")
     set_p.add_argument("--mode", choices=["auto", "light", "dark"], help="Preferred mode override")
+    set_p.add_argument("--variant", help="Variant within a scheme/flavour (if supported)")
+    set_p.add_argument("--notify", action="store_true", help="Show a desktop notification after applying")
 
-    # scheme list [--names] [--flavours NAME]
+    # scheme list [--json] [--names | --flavours NAME | --modes [NAME [FLAVOUR]] | --variants]
     list_p = actions.add_parser("list", help="List available schemes")
+    list_p.add_argument("--json", action="store_true", help="Emit machine-readable JSON when listing all")
     out_grp = list_p.add_mutually_exclusive_group()
     out_grp.add_argument("--names", action="store_true", help="List scheme names only")
-    out_grp.add_argument("--flavours", metavar="NAME", help="List flavours for a specific scheme")
+    out_grp.add_argument("--flavours", metavar="NAME", help="List flavours for a specific scheme NAME")
+    # zero, one, or two args: "modes", "modes NAME", or "modes NAME FLAVOUR"
+    out_grp.add_argument(
+        "--modes",
+        nargs="*",
+        metavar=("NAME", "FLAVOUR"),
+        help="List modes (optionally for a specific NAME and FLAVOUR)",
+    )
+    out_grp.add_argument("--variants", action="store_true", help="List global variants (if any)")
 
 
 @register(
@@ -65,20 +76,20 @@ class SchemeCommand(BaseCommand):
 
         scheme = get_scheme()
 
-        if self.args.notify:
+        if getattr(self.args, "notify", False):
             scheme.notify = True
 
-        if self.args.random:
+        if getattr(self.args, "random", False):
             scheme.set_random()
             apply_colours(scheme.colours, scheme.mode)
-        elif self.args.name or self.args.flavour or self.args.mode or self.args.variant:
-            if self.args.name:
+        elif any(getattr(self.args, k, None) for k in ("name", "flavour", "mode", "variant")):
+            if getattr(self.args, "name", None):
                 scheme.name = self.args.name
-            if self.args.flavour:
+            if getattr(self.args, "flavour", None):
                 scheme.flavour = self.args.flavour
-            if self.args.mode:
+            if getattr(self.args, "mode", None):
                 scheme.mode = self.args.mode
-            if self.args.variant:
+            if getattr(self.args, "variant", None):
                 scheme.variant = self.args.variant
             apply_colours(scheme.colours, scheme.mode)
         else:
@@ -97,29 +108,29 @@ class SchemeCommand(BaseCommand):
         print(f"{name} ({flavour}) [{mode}]")
 
     def _do_list(self) -> None:
-        multiple = [self.args.names, self.args.flavours, self.args.modes, self.args.variants].count(True) > 1
+        names = getattr(self.args, "names", False)
+        flavours = getattr(self.args, "flavours", None)
+        modes_arg = getattr(self.args, "modes", None)
+        variants = getattr(self.args, "variants", False)
 
-        if self.args.names or self.args.flavours or self.args.modes or self.args.variants:
-            if self.args.names:
-                if multiple:
-                    print("Names:", *get_scheme_names())
-                else:
-                    print("\n".join(get_scheme_names()))
-            if self.args.flavours:
-                if multiple:
-                    print("Flavours:", *get_scheme_flavours())
-                else:
-                    print("\n".join(get_scheme_flavours()))
-            if self.args.modes:
-                if multiple:
-                    print("Modes:", *get_scheme_modes())
+        if names or flavours is not None or modes_arg is not None or variants:
+            if names:
+                print("\n".join(get_scheme_names()))
+                return
+            if flavours is not None:
+                print("\n".join(get_scheme_flavours(flavours)))
+                return
+            if modes_arg is not None:
+                if len(modes_arg) >= 2:
+                    print("\n".join(get_scheme_modes(modes_arg[0], modes_arg[1])))
+                elif len(modes_arg) == 1:
+                    print("\n".join(get_scheme_modes(modes_arg[0])))
                 else:
                     print("\n".join(get_scheme_modes()))
-            if self.args.variants:
-                if multiple:
-                    print("Variants:", *scheme_variants)
-                else:
-                    print("\n".join(scheme_variants))
+                return
+            if variants:
+                print("\n".join(scheme_variants))
+                return
         else:
             current_scheme = get_scheme()
             schemes = {}
@@ -145,4 +156,7 @@ class SchemeCommand(BaseCommand):
                     except ValueError:
                         pass
 
-            print(json.dumps(schemes))
+            if getattr(self.args, "json", False):
+                print(json.dumps(schemes, ensure_ascii=False, indent=2))
+            else:
+                print(json.dumps(schemes))
