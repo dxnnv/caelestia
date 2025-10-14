@@ -360,7 +360,13 @@ default, you must create it manually.
             "occupiedLabel": "󰮯",
             "perMonitorWorkspaces": true,
             "showWindows": true,
-            "shown": 5
+            "shown": 5,
+            "specialWorkspaceIcons": [
+                {
+                    "name": "steam",
+                    "icon": "sports_esports"
+                }
+            ]
         }
     },
     "border": {
@@ -507,7 +513,7 @@ default, you must create it manually.
         "expandThreshold": 20,
         "expire": false,
         "timeoutBar": false,
-        "timeoutCircle": false,
+        "timeoutCircle": false
     },
     "osd": {
         "enabled": true,
@@ -560,42 +566,14 @@ default, you must create it manually.
             "configLoaded": true,
             "dndChanged": true,
             "gameModeChanged": true,
-            "numLockChanged": true
+            "numLockChanged": true,
+            "nowPlaying": true
         }
     }
 }
 ```
 
 </details>
-
-### Home Manager Module
-
-For NixOS users, a home manager module is also available.
-
-<details><summary><code>home.nix</code></summary>
-
-```nix
-programs.caelestia = {
-  enable = true;
-  systemd = {
-    enable = false; # if you prefer starting from your compositor
-    target = "graphical-session.target";
-    environment = [];
-  };
-  settings = {
-    paths.wallpaperDir = "~/Images";
-  };
-  cli = {
-    enable = true; # Also add caelestia-cli to path
-    settings = {
-      theme.enableGtk = false;
-    };
-  };
-};
-```
-
-The module automatically adds Caelestia shell to the path with **full functionality**. The CLI is not required, however you have the option to enable and configure it.
-
 </details>
 
 ## FAQ
