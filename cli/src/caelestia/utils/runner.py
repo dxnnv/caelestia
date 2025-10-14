@@ -2,6 +2,7 @@ import os
 import shutil
 import subprocess
 from collections.abc import Sequence
+from typing import Any
 
 StrPath = str | os.PathLike[str]
 
@@ -21,6 +22,12 @@ def run(cmd: Sequence[str], **kw) -> int:
     return subprocess.run(cmd, **kw).returncode
 
 
-def installed(cmd: StrPath):
+def run_proc(cmd: Sequence[str], **kw) -> subprocess.CompletedProcess[Any]:
+    installed(cmd[0])
+    return subprocess.run(cmd, **kw)
+
+
+def installed(cmd: StrPath) -> bool:
     if not shutil.which(str(cmd)):
         raise RuntimeError(f"Missing dependency: {cmd}")
+    return True
