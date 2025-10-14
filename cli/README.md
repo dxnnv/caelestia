@@ -4,17 +4,22 @@ The main control script for the Caelestia dotfiles.
 
 <details><summary id="dependencies">External dependencies</summary>
 
--   [`libnotfy`](https://gitlab.gnome.org/GNOME/libnotify) - sending notifications
--   [`swappy`](https://github.com/jtheoof/swappy) - screenshot editor
--   [`grim`](https://gitlab.freedesktop.org/emersion/grim) - taking screenshots
--   [`dart-sass`](https://github.com/sass/dart-sass) - discord theming
 -   [`app2unit`](https://github.com/Vladimir-csp/app2unit) - launching apps
--   [`wl-clipboard`](https://github.com/bugaevc/wl-clipboard) - copying to clipboard
--   [`slurp`](https://github.com/emersion/slurp) - selecting an area
--   [`gpu-screen-recorder`](https://git.dec05eba.com/gpu-screen-recorder/about) - screen recording
--   `glib2` - closing notifications
 -   [`cliphist`](https://github.com/sentriz/cliphist) - clipboard history
+-   [`dart-sass`](https://github.com/sass/dart-sass) - discord theming
 -   [`fuzzel`](https://codeberg.org/dnkl/fuzzel) - clipboard history/emoji picker
+-   `glib2` - closing notifications
+-   [`gpu-screen-recorder`](https://git.dec05eba.com/gpu-screen-recorder/about) - screen recording
+-   `hyprshot` - taking screenshots
+-   [`libnotfy`](https://gitlab.gnome.org/GNOME/libnotify) - sending notifications
+-   [`slurp`](https://github.com/emersion/slurp) - selecting an area
+-   [`swappy`](https://github.com/jtheoof/swappy) - screenshot editor
+-   [`wl-clipboard`](https://github.com/bugaevc/wl-clipboard) - copying to clipboard
+
+-   [`python-build`](https://github.com/pypa/build)
+-   [`python-installer`](https://github.com/pypa/installer)
+-   [`python-hatch`](https://github.com/pypa/hatch)
+-   [`python-hatch-vcs`](https://github.com/ofek/hatch-vcs)
 
 </details>
 
@@ -22,33 +27,20 @@ The main control script for the Caelestia dotfiles.
 
 ### Arch linux
 
-The CLI is available from the AUR as `caelestia-cli`. You can install it with an AUR helper
-like [`yay`](https://github.com/Jguer/yay) or manually downloading the PKGBUILD and running `makepkg -si`.
-
-A package following the latest commit also exists as `caelestia-cli-git`. This is bleeding edge
-and likely to be unstable/have bugs. Regular users are recommended to use the stable package
-(`caelestia-cli`).
+-   Download the PKGBUILD
+-   Run `makepkg -si`
 
 ### Manual installation
 
-Install all [dependencies](#dependencies), then install
-[`python-build`](https://github.com/pypa/build),
-[`python-installer`](https://github.com/pypa/installer),
-[`python-hatch`](https://github.com/pypa/hatch) and
-[`python-hatch-vcs`](https://github.com/ofek/hatch-vcs).
-
-e.g. via an AUR helper (yay)
-
-```sh
-yay -S libnotify swappy grim dart-sass app2unit wl-clipboard slurp gpu-screen-recorder glib2 cliphist fuzzel python-build python-installer python-hatch python-hatch-vcs
-```
-
-Now, clone the repo, `cd` into it, build the wheel via `python -m build --wheel`
-and install it via `python -m installer dist/*.whl`. Then, to install the `fish`
-completions, copy the `completions/caelestia.fish` file to
-`/usr/share/fish/vendor_completions.d/caelestia.fish`.
+-   Install all [dependencies](#dependencies) (e.g. via an AUR helper like `yay`)
+-   Clone the repo
+-   `cd` into the repo root
+-   Build the wheel with Python
+-   Install the wheel
+-   Copy the Fish completions to your Fish completions directory
 
 ```sh
+yay -S libnotify swappy hyprshot dart-sass app2unit wl-clipboard slurp gpu-screen-recorder glib2 cliphist fuzzel python-build python-installer python-hatch python-hatch-vcs
 git clone https://github.com/caelestia-dots/cli.git
 cd cli
 python -m build --wheel

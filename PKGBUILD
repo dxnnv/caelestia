@@ -8,47 +8,62 @@ license=('GPLv3')
 
 depends=(
   # Runtime CLI/tools
-  'aubio'
-  'libnotify'
-  'swappy'
-  'grim'
   'dart-sass'
-  'app2unit'
-  'wl-clipboard'
-  'slurp'
-  'gpu-screen-recorder'
-  'cliphist'
-  'fuzzel'
-  'ddcutil'
-  'brightnessctl'
   'libqalculate'
+  'lm_sensors'
+  'networkmanager'
+
+  ## Applications
+  'app2unit'
+  'fuzzel'
+
+  ## Capture
+  'aubio'
+  'hyprshot'
+  'gpu-screen-recorder'
+  'slurp'
+  'swappy'
+
+  ## Clipboard
+  'cliphist'
+  'wl-clipboard'
+
+  ## Display
+  'brightnessctl'
+  'ddcutil'
+  'hyprsunset'
+
+  ## Notifications
+  'libnotify'
+  'swaync'
+
+  ## Shell
   'bash'
   'fish'
-  'networkmanager'
-  'lm_sensors'
 
   # Libraries / runtime
+  'gcc-libs'
   'glib2'
   'glibc'
-  'libpipewire'
-  'gcc-libs'
   'libcava'
+  'libpipewire'
+  'quickshell'
 
   # Qt / build chain
-  'qt6-base'
-  'qt6-declarative'
   'cmake'
   'ninja'
+  'qt6-base'
+  'qt6-declarative'
 
-  # Fonts / assets (keep as depends if Caelestia truly needs them present)
+  # Fonts / assets
   'ttf-material-symbols-variable-git'
   #'caskadiya-cove-nerd'
 
-  # AUR / VCS
-  'quickshell-git'
+
+  'quickshell'
 )
 
-# No sources; this package is empty by design.
+# No sources, package is intentionally empty.
 provides=('caelestia-meta')
 conflicts=()
 source=()
