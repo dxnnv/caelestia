@@ -6,7 +6,10 @@ import qs.services
 import qs.config
 import qs.utils
 import QtQuick
+import Caelestia
+import Quickshell.Io
 import QtQuick.Layouts
+import Quickshell
 
 Item {
     id: root
@@ -20,8 +23,15 @@ Item {
     required property bool sourceMuted
     required property real brightness
 
+    property real lastVolume: (volume > 0 ? volume : 0.5)
+    property real lastSourceVolume: (sourceVolume > 0 ? sourceVolume : 0.5)
+
     implicitWidth: layout.implicitWidth + Appearance.padding.large * 2
     implicitHeight: layout.implicitHeight + Appearance.padding.large * 2
+
+    function clamp(x) {
+        return Math.max(0, Math.min(1, x));
+    }
 
     ColumnLayout {
         id: layout
@@ -46,7 +56,21 @@ Item {
 
                 icon: Icons.getVolumeIcon(value, root.muted)
                 value: root.volume
-                onMoved: Audio.setVolume(value)
+                onMoved: {
+                    if (value > 0)
+                        root.lastVolume = value;
+                    Audio.setVolume(value);
+                }
+
+                enableIconTap: true
+                onIconTapped: {
+                    if (root.muted || root.volume === 0) {
+                        Audio.setVolume(root.clamp(root.lastVolume || 0.5));
+                    } else {
+                        root.lastVolume = root.volume > 0 ? root.volume : (root.lastVolume || 0.5);
+                        Audio.setVolume(0);
+                    }
+                }
             }
         }
 
@@ -70,7 +94,21 @@ Item {
 
                     icon: Icons.getMicVolumeIcon(value, root.sourceMuted)
                     value: root.sourceVolume
-                    onMoved: Audio.setSourceVolume(value)
+                    onMoved: {
+                        if (value > 0)
+                            root.lastSourceVolume = value;
+                        Audio.setSourceVolume(value);
+                    }
+
+                    enableIconTap: true
+                    onIconTapped: {
+                        if (root.sourceMuted || root.sourceVolume === 0) {
+                            Audio.setSourceVolume(root.clamp(root.lastSourceVolume || 0.5));
+                        } else {
+                            root.lastSourceVolume = root.sourceVolume > 0 ? root.sourceVolume : (root.lastSourceVolume || 0.5);
+                            Audio.setSourceVolume(0);
+                        }
+                    }
                 }
             }
         }
@@ -99,6 +137,9 @@ Item {
                     icon: `brightness_${(Math.round(value * 6) + 1)}`
                     value: root.brightness
                     onMoved: root.monitor?.setBrightness(value)
+
+                    enableIconTap: true
+                    onIconTapped: HyprSunset.toggle(5000)
                 }
             }
         }
