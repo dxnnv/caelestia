@@ -1,0 +1,121 @@
+primary_paletteKeyColor 9a9a9a
+secondary_paletteKeyColor 8a8a8a
+tertiary_paletteKeyColor b3b3b3
+neutral_paletteKeyColor 777777
+neutral_variant_paletteKeyColor 7f7f7f
+
+background 222222
+onBackground e6e6e6
+surface 222222
+surfaceDim 1a1a1a
+surfaceBright 2c2c2c
+surfaceContainerLowest 121212
+surfaceContainerLow 1b1b1b
+surfaceContainer 1f1f1f
+surfaceContainerHigh 262626
+surfaceContainerHighest 2f2f2f
+onSurface e6e6e6
+surfaceVariant 3a3a3a
+onSurfaceVariant c8c8c8
+inverseSurface e6e6e6
+inverseOnSurface 2a2a2a
+outline 6e6e6e
+outlineVariant 3a3a3a
+shadow 000000
+scrim 000000
+surfaceTint cfcfcf
+
+primary dcdcdc
+onPrimary 141414
+primaryContainer 4a4a4a
+onPrimaryContainer f2f2f2
+inversePrimary 6f6f6f
+
+secondary c6c6c6
+onSecondary 141414
+secondaryContainer 424242
+onSecondaryContainer efefef
+
+tertiary b3b3b3
+onTertiary 141414
+tertiaryContainer 3b3b3b
+onTertiaryContainer eeeeee
+
+error cfcfcf
+onError 1a1a1a
+errorContainer 3f3f3f
+onErrorContainer f2f2f2
+
+primaryFixed e4e4e4
+primaryFixedDim dcdcdc
+onPrimaryFixed 0d0d0d
+onPrimaryFixedVariant 2f2f2f
+secondaryFixed e0e0e0
+secondaryFixedDim c6c6c6
+onSecondaryFixed 0d0d0d
+onSecondaryFixedVariant 303030
+tertiaryFixed d8d8d8
+tertiaryFixedDim b3b3b3
+onTertiaryFixed 0d0d0d
+onTertiaryFixedVariant 2a2a2a
+
+term0 0e0e0e
+term1 1a1a1a
+term2 2a2a2a
+term3 3a3a3a
+term4 4a4a4a
+term5 5a5a5a
+term6 6a6a6a
+term7 7a7a7a
+term8 8a8a8a
+term9 969696
+term10 a3a3a3
+term11 b0b0b0
+term12 bdbdbd
+term13 cacaca
+term14 d7d7d7
+term15 e4e4e4
+
+rosewater e6e6e6
+flamingo dcdcdc
+pink d2d2d2
+mauve c8c8c8
+red bebebe
+maroon b4b4b4
+peach aaaaaa
+yellow a0a0a0
+green 969696
+teal 8c8c8c
+sky 828282
+sapphire 787878
+blue 6e6e6e
+lavender 646464
+
+klink 9c9c9c
+klinkSelection a7a7a7
+kvisited 8a8a8a
+kvisitedSelection 949494
+knegative 7a7a7a
+knegativeSelection 848484
+kneutral 707070
+kneutralSelection 7a7a7a
+kpositive a9a9a9
+kpositiveSelection b3b3b3
+
+text e6e6e6
+subtext1 cfcfcf
+subtext0 a3a3a3
+overlay2 8f8f8f
+overlay1 7a7a7a
+overlay0 636363
+surface2 4a4a4a
+surface1 3a3a3a
+surface0 2a2a2a
+base 222222
+mantle 222222
+crust 1c1c1c
+
+success cccccc
+onSuccess 232323
+successContainer 3c3c3c
+onSuccessContainer e8e8e8
