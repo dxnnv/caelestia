@@ -1,137 +1,106 @@
 #include "appdb.hpp"
 
-#include <QMetaMethod>
-#include <QMetaObject>
-#include <QMetaProperty>
-#include <QPointer>
-#include <QSet>
-#include <algorithm>
-
-#include <QSqlDatabase>
-#include <QSqlQuery>
-#include <QUuid>
+#include <qsqldatabase.h>
+#include <qsqlquery.h>
+#include <quuid.h>
 
 namespace caelestia {
 
-// ——— AppEntry ————————————————————————————————————————————————————————————————
-
-static inline QString readStringProp(const QObject* o, const char* name) {
-    if (!o)
-        return {};
-    return o->property(name).toString();
-}
-
-static inline QString joinStringListProp(const QObject* o, const char* name) {
-    if (!o)
-        return {};
-    const QVariant v = o->property(name);
-    if (v.metaType() == QMetaType::fromType<QStringList>()) {
-        return v.toStringList().join(u' ');
-    }
-    // If some providers expose a single string already:
-    return v.toString();
-}
-
-AppEntry::AppEntry(QObject* entry, quint32 frequency, QObject* parent)
+AppEntry::AppEntry(QObject* entry, unsigned int frequency, QObject* parent)
     : QObject(parent)
     , m_entry(entry)
     , m_frequency(frequency) {
-    // Mirror notify signals from the underlying DesktopEntry to our own notifies.
-    mirrorNotifySignals();
+    const auto mo = m_entry->metaObject();
+    const auto tmo = metaObject();
 
-    // When the underlying entry goes away, drop ourselves as well.
+    for (const auto& prop :
+        { "name", "comment", "execString", "startupClass", "genericName", "categories", "keywords" }) {
+        const auto metaProp = mo->property(mo->indexOfProperty(prop));
+        const auto thisMetaProp = tmo->property(tmo->indexOfProperty(prop));
+        QObject::connect(m_entry, metaProp.notifySignal(), this, thisMetaProp.notifySignal());
+    }
+
     QObject::connect(m_entry, &QObject::destroyed, this, [this]() {
         m_entry = nullptr;
         deleteLater();
     });
 }
 
-void AppEntry::mirrorNotifySignals() {
-    if (!m_entry)
-        return;
-
-    const QMetaObject* srcMo = m_entry->metaObject();
-    const QMetaObject* dstMo = this->metaObject();
-
-    auto connectNotify = [&](const char* propName, const char* dstSignalSig) {
-        const int pidx = srcMo->indexOfProperty(propName);
-        if (pidx < 0)
-            return; // property not found on source
-
-        const QMetaProperty srcProp = srcMo->property(pidx);
-        if (!srcProp.hasNotifySignal())
-            return;
-
-        const QMetaMethod srcSig = srcProp.notifySignal();
-
-        const int didx = dstMo->indexOfSignal(dstSignalSig); // e.g. "nameChanged()"
-        if (didx < 0)
-            return;
-
-        const QMetaMethod dstSig = dstMo->method(didx);
-
-        // signal→signal is fine if both are void()
-        QObject::connect(m_entry, srcSig, this, dstSig);
-    };
-
-    connectNotify("name", "nameChanged()");
-    connectNotify("comment", "commentChanged()");
-    connectNotify("execString", "execStringChanged()");
-    connectNotify("startupClass", "startupClassChanged()");
-    connectNotify("genericName", "genericNameChanged()");
-    connectNotify("categories", "categoriesChanged()");
-    connectNotify("keywords", "keywordsChanged()");
+QObject* AppEntry::entry() const {
+    return m_entry;
 }
 
 quint32 AppEntry::frequency() const {
     return m_frequency;
 }
 
-void AppEntry::setFrequency(quint32 frequency) {
-    if (m_frequency == frequency)
-        return;
-    m_frequency = frequency;
-    emit frequencyChanged();
+void AppEntry::setFrequency(unsigned int frequency) {
+    if (m_frequency != frequency) {
+        m_frequency = frequency;
+        emit frequencyChanged();
+    }
 }
 
 void AppEntry::incrementFrequency() {
-    ++m_frequency;
+    m_frequency++;
     emit frequencyChanged();
 }
 
 QString AppEntry::id() const {
-    return readStringProp(m_entry, "id");
+    if (!m_entry) {
+        return "";
+    }
+    return m_entry->property("id").toString();
 }
 
 QString AppEntry::name() const {
-    return readStringProp(m_entry, "name");
+    if (!m_entry) {
+        return "";
+    }
+    return m_entry->property("name").toString();
 }
 
 QString AppEntry::comment() const {
-    return readStringProp(m_entry, "comment");
+    if (!m_entry) {
+        return "";
+    }
+    return m_entry->property("comment").toString();
 }
 
 QString AppEntry::execString() const {
-    return readStringProp(m_entry, "execString");
+    if (!m_entry) {
+        return "";
+    }
+    return m_entry->property("execString").toString();
 }
 
 QString AppEntry::startupClass() const {
-    return readStringProp(m_entry, "startupClass");
+    if (!m_entry) {
+        return "";
+    }
+    return m_entry->property("startupClass").toString();
 }
 
 QString AppEntry::genericName() const {
-    return readStringProp(m_entry, "genericName");
+    if (!m_entry) {
+        return "";
+    }
+    return m_entry->property("genericName").toString();
 }
 
 QString AppEntry::categories() const {
-    return joinStringListProp(m_entry, "categories");
+    if (!m_entry) {
+        return "";
+    }
+    return m_entry->property("categories").toStringList().join(" ");
 }
 
 QString AppEntry::keywords() const {
-    return joinStringListProp(m_entry, "keywords");
+    if (!m_entry) {
+        return "";
+    }
+    return m_entry->property("keywords").toStringList().join(" ");
 }
-
-// ——— AppDb ————————————————————————————————————————————————————————————————
 
 AppDb::AppDb(QObject* parent)
     : QObject(parent)
@@ -141,7 +110,6 @@ AppDb::AppDb(QObject* parent)
     m_timer->setInterval(300);
     QObject::connect(m_timer, &QTimer::timeout, this, &AppDb::updateApps);
 
-    // in-memory DB for default
     auto db = QSqlDatabase::addDatabase("QSQLITE", m_uuid);
     db.setDatabaseName(":memory:");
     db.open();
@@ -159,14 +127,16 @@ QString AppDb::path() const {
 }
 
 void AppDb::setPath(const QString& path) {
-    const QString newPath = path.isEmpty() ? QStringLiteral(":memory:") : path;
-    if (m_path == newPath)
+    auto newPath = path.isEmpty() ? ":memory:" : path;
+
+    if (m_path == newPath) {
         return;
+    }
 
     m_path = newPath;
     emit pathChanged();
 
-    auto db = QSqlDatabase::database(m_uuid, /*open*/ false);
+    auto db = QSqlDatabase::database(m_uuid, false);
     db.close();
     db.setDatabaseName(newPath);
     db.open();
@@ -177,51 +147,58 @@ void AppDb::setPath(const QString& path) {
     updateAppFrequencies();
 }
 
-QList<QObject*> AppDb::entries() const {
+QObjectList AppDb::entries() const {
     return m_entries;
 }
 
-void AppDb::setEntries(const QList<QObject*>& entries) {
-    if (m_entries == entries)
+void AppDb::setEntries(const QObjectList& entries) {
+    if (m_entries == entries) {
         return;
+    }
 
     m_entries = entries;
     emit entriesChanged();
 
-    // Batch updates to avoid churning.
     m_timer->start();
 }
 
-QList<AppEntry*> AppDb::apps() const {
-    auto vec = m_apps.values();
-    std::sort(vec.begin(), vec.end(), [](AppEntry* a, AppEntry* b) {
-        if (a->frequency() != b->frequency())
-            return a->frequency() > b->frequency();
-        return a->name().localeAwareCompare(b->name()) < 0;
-    });
-    return vec;
+QQmlListProperty<AppEntry> AppDb::apps() {
+    return QQmlListProperty<AppEntry>(this, &getSortedApps());
 }
 
 void AppDb::incrementFrequency(const QString& id) {
     auto db = QSqlDatabase::database(m_uuid);
     QSqlQuery query(db);
 
-    query.prepare("INSERT INTO frequencies (id, frequency) VALUES (:id, 1) "
+    query.prepare("INSERT INTO frequencies (id, frequency) "
+                  "VALUES (:id, 1) "
                   "ON CONFLICT (id) DO UPDATE SET frequency = frequency + 1");
     query.bindValue(":id", id);
     query.exec();
 
-    for (auto* app : std::as_const(m_apps)) {
-        if (app->id() == id) {
-            const auto before = apps();
-            app->incrementFrequency();
-            if (before != apps())
-                emit appsChanged();
-            return;
-        }
-    }
+    auto* app = m_apps.value(id);
+    if (app) {
+        const auto before = getSortedApps();
 
-    qWarning() << "AppDb::incrementFrequency: could not find app with id" << id;
+        app->incrementFrequency();
+
+        if (before != getSortedApps()) {
+            emit appsChanged();
+        }
+    } else {
+        qWarning() << "AppDb::incrementFrequency: could not find app with id" << id;
+    }
+}
+
+QList<AppEntry*>& AppDb::getSortedApps() const {
+    m_sortedApps = m_apps.values();
+    std::sort(m_sortedApps.begin(), m_sortedApps.end(), [](AppEntry* a, AppEntry* b) {
+        if (a->frequency() != b->frequency()) {
+            return a->frequency() > b->frequency();
+        }
+        return a->name().localeAwareCompare(b->name()) < 0;
+    });
+    return m_sortedApps;
 }
 
 quint32 AppDb::getFrequency(const QString& id) const {
@@ -231,59 +208,58 @@ quint32 AppDb::getFrequency(const QString& id) const {
     query.prepare("SELECT frequency FROM frequencies WHERE id = :id");
     query.bindValue(":id", id);
 
-    if (query.exec() && query.next())
+    if (query.exec() && query.next()) {
         return query.value(0).toUInt();
+    }
 
     return 0;
 }
 
 void AppDb::updateAppFrequencies() {
-    for (auto* app : std::as_const(m_apps))
+    const auto before = getSortedApps();
+
+    for (auto* app : std::as_const(m_apps)) {
         app->setFrequency(getFrequency(app->id()));
+    }
+
+    if (before != getSortedApps()) {
+        emit appsChanged();
+    }
 }
 
 void AppDb::updateApps() {
     bool dirty = false;
 
-    // Add or refresh
     for (const auto& entry : std::as_const(m_entries)) {
-        const auto idVar = entry->property("id");
-        const QString id = idVar.toString();
-        if (id.isEmpty())
-            continue;
-
+        const auto id = entry->property("id").toString();
         if (!m_apps.contains(id)) {
             dirty = true;
-            auto* newEntry = new AppEntry(entry, getFrequency(id), this);
-            QObject::connect(newEntry, &QObject::destroyed, this, [this, id]() {
-                if (m_apps.remove(id))
+            auto* const newEntry = new AppEntry(entry, getFrequency(id), this);
+            QObject::connect(newEntry, &QObject::destroyed, this, [id, this]() {
+                if (m_apps.remove(id)) {
                     emit appsChanged();
+                }
             });
             m_apps.insert(id, newEntry);
         }
     }
 
-    // Remove missing
     QSet<QString> newIds;
-    newIds.reserve(m_entries.size());
-    for (const auto& entry : std::as_const(m_entries))
+    for (const auto& entry : std::as_const(m_entries)) {
         newIds.insert(entry->property("id").toString());
-
-    for (auto it = m_apps.keyBegin(); it != m_apps.keyEnd();) {
-        const QString& id = *it;
-        if (!newIds.contains(id)) {
-            dirty = true;
-            auto* doomed = m_apps.take(id);
-            doomed->deleteLater();
-            // key iterator invalidated by take(): restart
-            it = m_apps.keyBegin();
-            continue;
-        }
-        ++it;
     }
 
-    if (dirty)
+    for (auto it = m_apps.keyBegin(); it != m_apps.keyEnd(); ++it) {
+        const auto& id = *it;
+        if (!newIds.contains(id)) {
+            dirty = true;
+            m_apps.take(id)->deleteLater();
+        }
+    }
+
+    if (dirty) {
         emit appsChanged();
+    }
 }
 
 } // namespace caelestia
