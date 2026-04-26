@@ -155,8 +155,16 @@ All configuration options are in `~/.config/caelestia/cli.json`.
         "enableSpicetify": true,
         "enableFuzzel": true,
         "enableBtop": true,
+        "enableNvtop": true,
+        "enableHtop": true,
         "enableGtk": true,
-        "enableQt": true
+        "enableQt": true,
+        "enableWarp": true,
+        "enableChromium": true,
+        "enableZed": true,
+        "enableCava": true,
+        "enableKitty": true,
+        "enableSwayNC": true
     },
     "toggles": {
         "communication": {
