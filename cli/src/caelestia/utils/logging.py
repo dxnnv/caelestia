@@ -7,11 +7,6 @@ def log_message(message: str) -> None:
 
 
 def log_exception(func):
-    """Log exceptions to stdout instead of raising
-
-    Used by the `apply_()` functions so that an exception, when applying
-    a theme, does not prevent the other themes from being applied.
-    """
     def wrapper(*args, **kwargs):
         try:
             func(*args, **kwargs)

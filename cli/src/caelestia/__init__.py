@@ -5,7 +5,7 @@ from caelestia.utils.version import print_version
 
 
 def main() -> int:
-    parser, args = parse_args()
+    _parser, args = parse_args()
 
     if getattr(args, "version", False):
         print_version()
@@ -16,5 +16,5 @@ def main() -> int:
         cmd_cls(args).run()
         return 0
 
-    parser.print_help()
+    _parser.print_help()
     return 2

@@ -1,7 +1,5 @@
-import re
 import subprocess
 from pathlib import Path
-from typing import Optional
 
 import caelestia.utils.runner as runner
 from caelestia.utils.paths import config_dir
@@ -23,8 +21,8 @@ def print_version() -> None:
     check_local()
 
 
-def check_git(dir: Path, branch: str, text: bool | None) -> str | bytes:
-    args = ["git", "-C", str(dir), "rev-list", "--format=%B", "--abbrev-commit", "--max-count=1", branch]
+def check_git(directory: Path, branch: str, text: bool | None) -> str | bytes:
+    args = ["git", "-C", str(directory), "rev-list", "--format=%B", "--abbrev-commit", "--max-count=1", branch]
     return (
         runner.check(args, stderr=subprocess.DEVNULL) if text else runner.check_bytes(args, stderr=subprocess.DEVNULL)
     )
@@ -116,10 +114,10 @@ def check_local():
         print_git_lines(local_shell_dir, "HEAD")
 
 
-def print_git_lines(dir: Path, branch: str, title: str | None = None):
-    input = check_git(dir, branch, True)
-    lines = [ln for ln in input.splitlines()[1:] if ln.strip()]
-    print(f"  ┌ {title or branch} ({input.split()[1]}): ")
+def print_git_lines(directory: Path, branch: str, title: str | None = None):
+    git_info = check_git(directory, branch, True)
+    lines = [ln for ln in git_info.splitlines()[1:] if ln.strip()]
+    print(f"  ┌ {title or branch} ({git_info.split()[1]}): ")
     for line in lines[:-1]:
         print(f"  ├─ {line}")
     print(f"  └─ {lines[-1]}")

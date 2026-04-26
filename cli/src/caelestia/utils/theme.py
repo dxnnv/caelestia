@@ -132,7 +132,7 @@ def apply_discord(scss: str) -> None:
 
     with tempfile.TemporaryDirectory("w") as tmp_dir:
         (Path(tmp_dir) / "_colours.scss").write_text(scss)
-        conf = runner.check(["sass", "-I", tmp_dir, templates_dir / "discord.scss"], text=True)
+        conf = runner.check(["sass", "-I", tmp_dir, templates_dir / "discord.scss"])
 
     for client in ("Equicord", "Vencord", "BetterDiscord", "equibop", "vesktop", "legcord"):
         client_dir = config_dir / client / "themes"
@@ -254,8 +254,8 @@ def apply_swaync(colours: dict[str, str]) -> None:
         write_file(config_dir / "swaync/style.css", css)
         subprocess.run(["swaync-client", "--reload-css"], check=False)
 
-    def define(name: str, hexval: str) -> str:
-        return f"@define-color {name} #{hexval};\n"
+    def define(name: str, hex: str) -> str:
+        return f"@define-color {name} #{hex};\n"
 
     lines: list[str] = []
     for key, hexval in colours.items():

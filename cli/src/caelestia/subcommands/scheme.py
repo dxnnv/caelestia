@@ -2,7 +2,7 @@ import json
 from argparse import ArgumentParser
 
 from caelestia.command import BaseCommand, register
-from caelestia.utils.logging import log_exception, log_message
+from caelestia.utils.logging import log_message
 from caelestia.utils.scheme import (
     Scheme,
     get_scheme,
@@ -67,7 +67,7 @@ class SchemeCommand(BaseCommand):
             case "list":
                 self._do_list()
             case _:
-                log_exception(f"Unknown scheme action: {action}")
+                log_message(f"Unknown scheme action: {action}")
 
     def _do_set(self) -> None:
         if self.args.name and self.args.name not in get_scheme_names():
@@ -150,8 +150,9 @@ class SchemeCommand(BaseCommand):
                     if s.mode not in modes:
                         s._mode = modes[0]
                     try:
-                        if hasattr(s, "_update_colours"):
-                            s._update_colours()
+                        update_colours = getattr(s, "_update_colours", None)
+                        if update_colours is not None:
+                            update_colours()
                         schemes[scheme][flavour] = s.colours
                     except ValueError:
                         pass

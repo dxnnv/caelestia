@@ -451,7 +451,7 @@ class Command(BaseCommand):
         log_message("Hyprland window resizer started")
         log_message(f"Loaded {len(self.window_rules)} window rules")
 
-        _, socket2_path = hypr._socket_paths()
+        _, socket2_path = hypr.socket_paths()
         socket_path = Path(socket2_path)
         if not socket_path.exists():
             log_message(f"ERROR: Hyprland socket not found at {socket_path}")
