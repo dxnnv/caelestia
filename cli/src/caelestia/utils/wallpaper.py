@@ -25,7 +25,7 @@ from caelestia.utils.theme import apply_colours
 
 
 def is_valid_image(path: Path) -> bool:
-    return path.is_file() and path.suffix.lower() in [".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff"]
+    return path.is_file() and path.suffix.lower() in [".jpg", ".jpeg", ".png", ".webp", ".tif", ".tiff", ".gif"]
 
 
 def check_wall(wall: Path, filter_size: tuple[int, int], threshold: float) -> bool:
@@ -119,6 +119,9 @@ def get_colours_for_wall(wall: Path | str, no_smart: bool) -> dict[str, str | di
     scheme = get_scheme()
     cache = wallpapers_cache_dir / compute_hash(wall)
 
+    if wall.suffix.lower() == ".gif":
+        wall = convert_gif(wall)
+
     name = "dynamic"
     if not no_smart:
         smart_opts = get_smart_opts(wall, cache)
@@ -141,23 +144,45 @@ def get_colours_for_wall(wall: Path | str, no_smart: bool) -> dict[str, str | di
     }
 
 
+def convert_gif(wall: Path) -> Path:
+    cache = wallpapers_cache_dir / compute_hash(wall)
+    output_path = cache / "first_frame.png"
+
+    if not output_path.exists():
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with Image.open(wall) as img:
+            try:
+                img.seek(0)
+            except EOFError:
+                pass
+
+            img = img.convert("RGB")
+            img.save(output_path, "PNG")
+
+    return output_path
+
+
 def set_wallpaper(wall: Path | str, no_smart: bool) -> None:
     wall = Path(wall).expanduser().resolve()
 
     if not is_valid_image(wall):
         raise ValueError(f'"{wall}" is not a valid image')
 
+    # Use gif's 1st frame for thumb only
+    wall_cache = convert_gif(wall) if wall.suffix.lower() == ".gif" else wall
+
     _atomic_relink(Path(wallpaper_link_path), wall)
 
-    cache = wallpapers_cache_dir / compute_hash(wall)
-    thumb = get_thumb(wall, cache)
+    cache = wallpapers_cache_dir / compute_hash(wall_cache)
+
+    thumb = get_thumb(wall_cache, cache)
     wallpaper_thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
 
     _atomic_relink(Path(wallpaper_thumbnail_path), thumb)
 
     scheme = get_scheme()
     if scheme.name == "dynamic" and not no_smart:
-        smart_opts = get_smart_opts(wall, cache)
+        smart_opts = get_smart_opts(wall_cache, cache)
         scheme.mode = smart_opts["mode"]
         scheme.variant = smart_opts["variant"]
 
