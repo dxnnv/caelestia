@@ -2,6 +2,7 @@ pragma Singleton
 pragma ComponentBehavior: Bound
 
 import qs.components.misc
+import qs.utils
 import Quickshell
 import Quickshell.Io
 import QtQuick
@@ -12,6 +13,8 @@ Singleton {
     property list<var> ddcMonitors: []
     readonly property list<Monitor> monitors: variants.instances
     property bool appleDisplayPresent: false
+    readonly property string ddcLockFile: `${Quickshell.env("XDG_RUNTIME_DIR")}/caelestia-ddcutil.lock`
+    property var ddcQueue: Promise.resolve()
 
     function getMonitorForScreen(screen: ShellScreen): var {
         return monitors.find(m => m.modelData === screen);
@@ -52,9 +55,40 @@ Singleton {
             monitor.setBrightness(monitor.brightness - 0.1);
     }
 
-    onMonitorsChanged: {
-        ddcMonitors = [];
-        ddcProc.running = true;
+    function ddcCommand(args): var {
+        return ["flock", "-w", "10", ddcLockFile, "ddcutil"].concat(args.map(a => String(a)));
+    }
+
+    function detectDdcMonitors(): void {
+        root.runDdc(["detect", "--brief"]).then(r => {
+            if (r.code !== 0) {
+                console.warn("ddcutil detect failed:", r.stderr || r.stdout);
+                return;
+            }
+
+            root.ddcMonitors = r.stdout.trim().split("\n\n").filter(d => d.startsWith("Display ")).map(d => ({
+                        busNum: d.match(/I2C bus:[ ]*\/dev\/i2c-([0-9]+)/)?.[1] ?? "",
+                        connector: d.match(/DRM connector:\s+(.*)/)?.[1]?.replace(/^card\d+-/, "") ?? ""
+                    })).filter(d => d.busNum !== "" && d.connector !== "");
+        });
+    }
+
+    function runDdc(args): var {
+        const run = () => ProcessUtil.run(ddcCommand(args));
+
+        // Serialize all ddcutil calls from this shell.
+        root.ddcQueue = root.ddcQueue.then(run, run);
+
+        return root.ddcQueue;
+    }
+
+    onMonitorsChanged: ddcDetectTimer.restart()
+
+    Timer {
+        id: ddcDetectTimer
+        interval: 1000
+        repeat: false
+        onTriggered: root.detectDdcMonitors()
     }
 
     Variants {
@@ -70,18 +104,6 @@ Singleton {
         command: ["sh", "-c", "asdbctl get"] // To avoid warnings if asdbctl is not installed
         stdout: StdioCollector {
             onStreamFinished: root.appleDisplayPresent = text.trim().length > 0
-        }
-    }
-
-    Process {
-        id: ddcProc
-
-        command: ["ddcutil", "detect", "--brief"]
-        stdout: StdioCollector {
-            onStreamFinished: root.ddcMonitors = text.trim().split("\n\n").filter(d => d.startsWith("Display ")).map(d => ({
-                        busNum: d.match(/I2C bus:[ ]*\/dev\/i2c-([0-9]+)/)[1],
-                        connector: d.match(/DRM connector:\s+(.*)/)[1].replace(/^card\d+-/, "") // strip "card1-"
-                    }))
         }
     }
 
@@ -158,7 +180,8 @@ Singleton {
         readonly property string busNum: root.ddcMonitors.find(m => m.connector === modelData.name)?.busNum ?? ""
         readonly property bool isAppleDisplay: root.appleDisplayPresent && modelData.model.startsWith("StudioDisplay")
         property real brightness
-        property real queuedBrightness: NaN
+        property real pendingBrightness: NaN
+        property bool ddcSetting: false
 
         readonly property Process initProc: Process {
             stdout: StdioCollector {
@@ -174,14 +197,25 @@ Singleton {
             }
         }
 
-        readonly property Timer timer: Timer {
-            interval: 500
-            onTriggered: {
-                if (!isNaN(monitor.queuedBrightness)) {
-                    monitor.setBrightness(monitor.queuedBrightness);
-                    monitor.queuedBrightness = NaN;
-                }
-            }
+        function flushDdcBrightness(): void {
+            if (ddcSetting || isNaN(pendingBrightness))
+                return;
+
+            const value = pendingBrightness;
+            pendingBrightness = NaN;
+
+            const rounded = Math.round(value * 100);
+            ddcSetting = true;
+
+            root.runDdc(["-b", busNum, "setvcp", "10", rounded]).then(r => {
+                if (r.code !== 0)
+                    console.warn(`ddcutil setvcp failed for bus ${busNum}:`, r.stderr || r.stdout);
+
+                ddcSetting = false;
+
+                if (!isNaN(pendingBrightness))
+                    flushDdcBrightness();
+            });
         }
 
         function setBrightness(value: real): void {
@@ -190,32 +224,50 @@ Singleton {
             if (Math.round(brightness * 100) === rounded)
                 return;
 
-            if (isDdc && timer.running) {
-                queuedBrightness = value;
+            brightness = value;
+
+            if (isAppleDisplay) {
+                Quickshell.execDetached(["asdbctl", "set", rounded]);
                 return;
             }
 
-            brightness = value;
+            if (isDdc) {
+                pendingBrightness = value;
+                flushDdcBrightness();
+                return;
+            }
 
-            if (isAppleDisplay)
-                Quickshell.execDetached(["asdbctl", "set", rounded]);
-            else if (isDdc)
-                Quickshell.execDetached(["ddcutil", "-b", busNum, "setvcp", "10", rounded]);
-            else
-                Quickshell.execDetached(["brightnessctl", "s", `${rounded}%`]);
-
-            if (isDdc)
-                timer.restart();
+            Quickshell.execDetached(["brightnessctl", "s", `${rounded}%`]);
         }
 
         function initBrightness(): void {
-            if (isAppleDisplay)
-                initProc.command = ["asdbctl", "get"];
-            else if (isDdc)
-                initProc.command = ["ddcutil", "-b", busNum, "getvcp", "10", "--brief"];
-            else
-                initProc.command = ["sh", "-c", "echo a b c $(brightnessctl g) $(brightnessctl m)"];
+            if (initProc.running)
+                return;
 
+            if (isAppleDisplay) {
+                initProc.command = ["asdbctl", "get"];
+                initProc.running = true;
+                return;
+            }
+
+            if (isDdc) {
+                root.runDdc(["-b", busNum, "getvcp", "10", "--brief"]).then(r => {
+                    if (r.code !== 0) {
+                        console.warn(`ddcutil getvcp failed for bus ${busNum}:`, r.stderr || r.stdout);
+                        return;
+                    }
+
+                    const parts = r.stdout.trim().split(/\s+/);
+                    const cur = parseInt(parts[3]);
+                    const max = parseInt(parts[4]);
+
+                    if (!isNaN(cur) && !isNaN(max) && max > 0)
+                        monitor.brightness = cur / max;
+                });
+                return;
+            }
+
+            initProc.command = ["sh", "-c", "echo a b c $(brightnessctl g) $(brightnessctl m)"];
             initProc.running = true;
         }
 
