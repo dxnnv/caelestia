@@ -4,22 +4,22 @@ The main control script for the Caelestia dotfiles.
 
 <details><summary id="dependencies">External dependencies</summary>
 
--   [`app2unit`](https://github.com/Vladimir-csp/app2unit) - launching apps
--   [`cliphist`](https://github.com/sentriz/cliphist) - clipboard history
--   [`dart-sass`](https://github.com/sass/dart-sass) - discord theming
--   [`fuzzel`](https://codeberg.org/dnkl/fuzzel) - clipboard history/emoji picker
--   `glib2` - closing notifications
--   [`gpu-screen-recorder`](https://git.dec05eba.com/gpu-screen-recorder/about) - screen recording
--   `hyprshot` - taking screenshots
--   [`libnotfy`](https://gitlab.gnome.org/GNOME/libnotify) - sending notifications
--   [`slurp`](https://github.com/emersion/slurp) - selecting an area
--   [`swappy`](https://github.com/jtheoof/swappy) - screenshot editor
--   [`wl-clipboard`](https://github.com/bugaevc/wl-clipboard) - copying to clipboard
+- [`app2unit`](https://github.com/Vladimir-csp/app2unit) - launching apps
+- [`cliphist`](https://github.com/sentriz/cliphist) - clipboard history
+- [`dart-sass`](https://github.com/sass/dart-sass) - discord theming
+- [`fuzzel`](https://codeberg.org/dnkl/fuzzel) - clipboard history/emoji picker
+- `glib2` - closing notifications
+- [`gpu-screen-recorder`](https://git.dec05eba.com/gpu-screen-recorder/about) - screen recording
+- `hyprshot` - taking screenshots
+- [`libnotfy`](https://gitlab.gnome.org/GNOME/libnotify) - sending notifications
+- [`slurp`](https://github.com/emersion/slurp) - selecting an area
+- [`swappy`](https://github.com/jtheoof/swappy) - screenshot editor
+- [`wl-clipboard`](https://github.com/bugaevc/wl-clipboard) - copying to clipboard
 
--   [`python-build`](https://github.com/pypa/build)
--   [`python-installer`](https://github.com/pypa/installer)
--   [`python-hatch`](https://github.com/pypa/hatch)
--   [`python-hatch-vcs`](https://github.com/ofek/hatch-vcs)
+- [`python-build`](https://github.com/pypa/build)
+- [`python-installer`](https://github.com/pypa/installer)
+- [`python-hatch`](https://github.com/pypa/hatch)
+- [`python-hatch-vcs`](https://github.com/ofek/hatch-vcs)
 
 </details>
 
@@ -27,17 +27,17 @@ The main control script for the Caelestia dotfiles.
 
 ### Arch linux
 
--   Download the PKGBUILD
--   Run `makepkg -si`
+- Download the PKGBUILD
+- Run `makepkg -si`
 
 ### Manual installation
 
--   Install all [dependencies](#dependencies) (e.g. via an AUR helper like `yay`)
--   Clone the repo
--   `cd` into the repo root
--   Build the wheel with Python
--   Install the wheel
--   Copy the Fish completions to your Fish completions directory
+- Install all [dependencies](#dependencies) (e.g. via an AUR helper like `yay`)
+- Clone the repo
+- `cd` into the repo root
+- Build the wheel with Python
+- Install the wheel
+- Copy the Fish completions to your Fish completions directory
 
 ```sh
 yay -S libnotify swappy hyprshot dart-sass app2unit wl-clipboard slurp gpu-screen-recorder glib2 cliphist fuzzel python-build python-installer python-hatch python-hatch-vcs
@@ -87,6 +87,9 @@ All configuration options are in `~/.config/caelestia/cli.json`.
 {
     "record": {
         "extraArgs": []
+    },
+    "wallpaper": {
+        "postHook": "echo $WALLPAPER_PATH"
     },
     "theme": {
         "enableTerm": true,
