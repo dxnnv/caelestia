@@ -2,8 +2,10 @@
 
 #include <QtConcurrent/qtconcurrentrun.h>
 #include <QtQuick/qquickitemgrabresult.h>
+#include <qfileinfo.h>
 #include <qfuturewatcher.h>
 #include <qimage.h>
+#include <qimagereader.h>
 #include <qquickwindow.h>
 
 namespace caelestia {
@@ -123,14 +125,24 @@ void ImageAnalyser::requestUpdate() {
     }
 }
 
-void ImageAnalyser::update() {
-    if (m_source.isEmpty() && !m_sourceItem) {
-        return;
-    }
+static QString normalizePath(const QString& s) {
+    const QUrl url = QUrl::fromUserInput(s);
+    if (!url.isValid())
+        return s;
 
-    if (m_futureWatcher->isRunning()) {
+    if (url.isLocalFile())
+        return url.toLocalFile();
+
+    if (url.scheme() == QStringLiteral("qrc"))
+        return QStringLiteral(":") + url.path();
+}
+
+void ImageAnalyser::update() {
+    if (m_source.isEmpty() && !m_sourceItem)
+        return;
+
+    if (m_futureWatcher->isRunning())
         m_futureWatcher->cancel();
-    }
 
     if (m_sourceItem) {
         const QSharedPointer<const QQuickItemGrabResult> grabResult = m_sourceItem->grabToImage();
@@ -138,8 +150,20 @@ void ImageAnalyser::update() {
             m_futureWatcher->setFuture(QtConcurrent::run(&ImageAnalyser::analyse, grabResult->image(), m_rescaleSize));
         });
     } else {
+        const QString path = normalizePath(m_source);
         m_futureWatcher->setFuture(QtConcurrent::run([=, this](QPromise<AnalyseResult>& promise) {
-            const QImage image(m_source);
+            QString p = path;
+
+            QFileInfo fi(p);
+            if (fi.isSymLink() && !fi.symLinkTarget().isEmpty())
+                p = fi.symLinkTarget();
+
+            QImageReader reader(p);
+            QImage image = reader.read();
+
+            if (image.isNull()) 
+                qWarning() << "Failed to load" << p << reader.errorString();
+
             analyse(promise, image, m_rescaleSize);
         }));
     }

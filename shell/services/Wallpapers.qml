@@ -10,7 +10,7 @@ import QtQuick
 Searcher {
     id: root
 
-    readonly property string currentNamePath: `${Paths.state}/wallpaper/path.txt`
+    readonly property string currentLinkPath: `${Paths.state}/wallpaper/current`
     readonly property list<string> smartArg: Config.services.smartScheme ? [] : ["--no-smart"]
 
     property bool showPreview: false
@@ -22,6 +22,26 @@ Searcher {
     function setWallpaper(path: string): void {
         actualCurrent = path;
         Quickshell.execDetached(["caelestia", "wallpaper", "-f", path, ...smartArg]);
+    }
+
+    function resolveCurrent(): void {
+        const link = String(currentLinkPath);
+        root.actualCurrent = link;
+
+        FileUtil.exists(link).then(exists => {
+            if (!exists)
+                root.actualCurrent = "";
+            else
+                return FileUtil.readlink(link).then(t => {
+                    const target = (typeof t === "string") ? t : "";
+                    if (!target)
+                        root.actualCurrent = link;
+                    else
+                        return FileUtil.exists(target).then(ok => root.actualCurrent = ok ? target : link);
+                });
+        }).catch(() => {
+            root.actualCurrent = link;
+        });
     }
 
     function preview(path: string): void {
@@ -62,13 +82,10 @@ Searcher {
     }
 
     FileView {
-        path: root.currentNamePath
+        path: root.currentLinkPath
         watchChanges: true
-        onFileChanged: reload()
-        onLoaded: {
-            root.actualCurrent = text().trim();
-            root.previewColourLock = false;
-        }
+        onFileChanged: root.resolveCurrent()
+        onLoaded: root.resolveCurrent()
     }
 
     FileSystemModel {
@@ -90,4 +107,6 @@ Searcher {
             }
         }
     }
+
+    Component.onCompleted: resolveCurrent()
 }
