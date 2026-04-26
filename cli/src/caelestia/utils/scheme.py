@@ -266,7 +266,9 @@ def get_scheme_flavours(name: str = "") -> list[str]:
     if name == "":
         name = get_scheme().name
 
-    return ["default"] if name == "dynamic" else [f.name for f in (scheme_data_dir / name).iterdir() if f.is_dir()]
+    return (
+        ["default", "hard"] if name == "dynamic" else [f.name for f in (scheme_data_dir / name).iterdir() if f.is_dir()]
+    )
 
 
 def get_scheme_modes(name: str = "", flavour: str = "") -> list[str]:

@@ -125,7 +125,7 @@ def get_colours_for_wall(wall: Path | str, no_smart: bool) -> dict[str, str | di
         scheme = Scheme(
             {
                 "name": name,
-                "flavour": "default",
+                "flavour": scheme.flavour,
                 "mode": smart_opts["mode"],
                 "variant": smart_opts["variant"],
                 "colours": scheme.colours,
@@ -134,7 +134,7 @@ def get_colours_for_wall(wall: Path | str, no_smart: bool) -> dict[str, str | di
 
     return {
         "name": name,
-        "flavour": "default",
+        "flavour": scheme.flavour,
         "mode": scheme.mode,
         "variant": scheme.variant,
         "colours": get_colours_for_image(get_thumb(wall, cache), scheme),
