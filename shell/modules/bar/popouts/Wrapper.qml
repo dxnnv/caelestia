@@ -54,6 +54,8 @@ Item {
 
     implicitWidth: nonAnimWidth
     implicitHeight: nonAnimHeight
+    width: implicitWidth
+    height: implicitHeight
 
     Keys.onEscapePressed: close()
 

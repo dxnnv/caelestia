@@ -7,6 +7,8 @@ Singleton {
     property var bars: new Map()
 
     function load(screen: ShellScreen, visibilities: var): void {
+        if (screen == null)
+            return;
         screens.set(Hypr.monitorFor(screen), visibilities);
     }
 

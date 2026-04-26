@@ -34,12 +34,12 @@ MouseArea {
     property real sh: Math.abs(sy - ey)
 
     property list<var> clients: {
-        const mon = Hypr.monitorFor(screen);
+        const mon = screen ? Hypr.monitorFor(screen) : null;
         if (!mon)
             return [];
 
         const special = mon.lastIpcObject.specialWorkspace;
-        const wsId = special.name ? special.id : mon.activeWorkspace.id;
+        const wsId = special.name ? special.id : mon.activeWorkspace?.id;
 
         return Hypr.toplevels.values.filter(c => c.workspace?.id === wsId).sort((a, b) => {
             // Pinned first, then fullscreen, then floating, then any other

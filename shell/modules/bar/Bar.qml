@@ -29,7 +29,7 @@ RowLayout {
         }
     }
 
-    function checkPopout(y: real): void {
+    function checkPopout(x: real): void {
         const ch = childAt(x, height / 2) as WrappedLoader;
 
         if (ch?.id !== "tray")
@@ -75,7 +75,7 @@ RowLayout {
         }
     }
 
-    function handleWheel(y: real, angleDelta: point): void {
+    function handleWheel(x: real, angleDelta: point): void {
         const ch = childAt(x, height / 2) as WrappedLoader;
         if (ch?.id === "workspaces" && Config.bar.scrollActions.workspaces) {
             // Workspace scroll
@@ -93,7 +93,9 @@ RowLayout {
                 Audio.decrementVolume();
         } else if (Config.bar.scrollActions.brightness) {
             // Brightness scroll on bottom half
-            const monitor = Brightness.getMonitorForScreen(screen);
+            const monitor = screen ? (Brightness.getMonitorForScreen(screen) ?? null) : null;
+            if (!monitor)
+                return;
             if (angleDelta.y > 0)
                 monitor.setBrightness(monitor.brightness + 0.1);
             else if (angleDelta.y < 0)
@@ -136,7 +138,7 @@ RowLayout {
                 delegate: WrappedLoader {
                     sourceComponent: ActiveWindow {
                         bar: root
-                        monitor: Brightness.getMonitorForScreen(root.screen)
+                        monitor: root.screen ? (Brightness.getMonitorForScreen(root.screen) ?? null) : null
                     }
                 }
             }

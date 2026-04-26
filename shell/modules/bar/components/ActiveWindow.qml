@@ -10,7 +10,7 @@ Item {
     id: root
 
     required property var bar
-    required property Brightness.Monitor monitor
+    required property var monitor
     property color colour: Colours.palette.m3primary
 
     readonly property int maxWidth: {

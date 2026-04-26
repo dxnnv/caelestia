@@ -7,7 +7,6 @@ import qs.utils
 import Caelestia
 import Quickshell
 import Quickshell.Io
-import Quickshell.Io as QsIo
 import Quickshell.Services.Notifications
 import QtQuick
 
@@ -99,7 +98,7 @@ Singleton {
         refreshCount();
     }
 
-    QsIo.Process {
+    Process {
         id: dndProc
     }
     Connections {
@@ -111,7 +110,7 @@ Singleton {
         }
     }
 
-    QsIo.Process {
+    Process {
         id: cntProc
     }
     Connections {
@@ -123,7 +122,7 @@ Singleton {
         }
     }
 
-    QsIo.Process {
+    Process {
         id: tap
         command: ["python3", Qt.resolvedUrl("notif_listen.py")]
         running: true

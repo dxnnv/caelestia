@@ -36,8 +36,16 @@ Loader {
             }
 
             Loader {
-                readonly property bool shouldBeActive: Config.background.visualiser.enabled && (!Config.background.visualiser.autoHide || Hypr.monitorFor(win.modelData).activeWorkspace.toplevels.values.every(t => t.lastIpcObject.floating)) ? 1 : 0
-                property real offset: shouldBeActive ? 0 : win.modelData.height * 0.2
+                readonly property var hyprMonitor: Hypr.monitorFor(win.modelData)
+                readonly property var activeWs: hyprMonitor ? hyprMonitor.activeWorkspace : null
+                readonly property bool shouldBeActive: {
+                    if (!Config.background.visualiser.enabled)
+                        return false;
+                    if (!Config.background.visualiser.autoHide)
+                        return true;
+                    return activeWs ? activeWs.toplevels.values.every(t => t.lastIpcObject.floating) : false;
+                }
+                property real offset: shouldBeActive ? 0 : ((win.modelData?.height ?? 0) * 0.2)
 
                 anchors.fill: parent
                 anchors.topMargin: offset

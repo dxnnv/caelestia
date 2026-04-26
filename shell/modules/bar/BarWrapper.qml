@@ -33,6 +33,7 @@ Item {
 
     visible: height > Config.border.thickness
     implicitHeight: Config.border.thickness
+    height: implicitHeight
 
     states: State {
         name: "visible"
@@ -71,7 +72,7 @@ Item {
         id: content
 
         anchors.left: parent.left
-        anchors.bottom: parent.bottom
+        anchors.top: parent.top
         anchors.right: parent.right
 
         active: root.shouldBeVisible || root.visible

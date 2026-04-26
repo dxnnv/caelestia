@@ -29,6 +29,7 @@ Item {
 
     Item {
         id: mask
+        z: 0.0
 
         anchors.fill: parent
         layer.enabled: true

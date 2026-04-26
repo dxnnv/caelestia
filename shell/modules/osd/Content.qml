@@ -14,7 +14,7 @@ import Quickshell
 Item {
     id: root
 
-    required property Brightness.Monitor monitor
+    required property var monitor
     required property var visibilities
 
     required property real volume

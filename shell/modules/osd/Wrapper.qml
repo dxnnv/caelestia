@@ -12,7 +12,7 @@ Item {
     required property ShellScreen screen
     required property var visibilities
     property bool hovered
-    readonly property Brightness.Monitor monitor: Brightness.getMonitorForScreen(root.screen)
+    readonly property var monitor: root.screen ? (Brightness.getMonitorForScreen(root.screen) ?? null) : null
     readonly property bool shouldBeActive: visibilities.osd && Config.osd.enabled && !(visibilities.utilities && Config.utilities.enabled)
 
     property real volume
@@ -95,7 +95,7 @@ Item {
     }
 
     Connections {
-        target: root.monitor
+        target: root.monitor ?? null
 
         function onBrightnessChanged(): void {
             root.show();
@@ -122,7 +122,7 @@ Item {
         Component.onCompleted: active = Qt.binding(() => root.shouldBeActive || root.visible)
 
         sourceComponent: Content {
-            monitor: root.monitor
+            monitor: root.monitor ?? null
             visibilities: root.visibilities
             volume: root.volume
             muted: root.muted
