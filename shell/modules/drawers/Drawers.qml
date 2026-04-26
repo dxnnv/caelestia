@@ -120,6 +120,19 @@ Variants {
                     shadowColor: Qt.alpha(Colours.palette.m3shadow, 0.7)
                 }
 
+                Rectangle {
+                    id: barStripBg
+                    z: -1
+                    x: Config.border.thickness
+                    y: 0
+                    width: parent.width - Config.border.thickness * 2
+                    height: bar.implicitHeight
+                    radius: Config.border.rounding
+                    visible: bar.visible && bar.implicitHeight > 0
+                    color: Colours.palette.m3surface
+                    opacity: Colours.transparency.enabled ? Colours.transparency.base : 1
+                }
+
                 Border {
                     bar: bar
                 }
