@@ -1,10 +1,32 @@
 import json
 import random
+import re
 from pathlib import Path
 from typing import Any
 
 from caelestia.utils.notify import notify
 from caelestia.utils.paths import atomic_dump, scheme_data_dir, scheme_path
+
+
+def read_colours_from_file(path: Path) -> dict[str, str]:
+    colours: dict[str, str] = {}
+    for lineno, raw in enumerate(path.read_text().splitlines(), 1):
+        line = raw.strip()
+        if not line or line.startswith(("#", ";")):
+            continue
+
+        parts = re.split(r"\s*[:=]\s*|\s+", line, maxsplit=1)
+        if len(parts) != 2:
+            raise ValueError(f"{path}:{lineno}: malformed line {raw!r}")
+
+        k, v = parts[0].strip(), parts[1].strip()
+
+        if v.startswith("#"):
+            v = v[1:]
+        v = v[:6]
+
+        colours[k] = v
+    return colours
 
 
 class Scheme:
@@ -22,7 +44,7 @@ class Scheme:
             self._flavour = "mocha"
             self._mode = "dark"
             self._variant = "tonalspot"
-            self._colours = self.read_colours_from_file(self.get_colours_path())
+            self._colours = read_colours_from_file(self.get_colours_path())
             self._default = True
         else:
             self._name = jsondict["name"]
@@ -127,8 +149,8 @@ class Scheme:
     def default(self) -> bool:
         return self._default
 
-    @variant.setter
-    def variant(self, state: bool) -> None:
+    @default.setter
+    def default(self, state: bool) -> None:
         if state == self._default:
             return
 
@@ -189,7 +211,7 @@ class Scheme:
                     )
                 raise ValueError(self.noWallpaperError) from e
         else:
-            self._colours = self.read_colours_from_file(self.get_colours_path())
+            self._colours = read_colours_from_file(self.get_colours_path())
 
     def __str__(self) -> str:
         return (
@@ -201,9 +223,6 @@ class Scheme:
             f"    Colours:\n"
             f"        {'\n        '.join(f'{n}: \x1b[38;2;{int(c[0:2], 16)};{int(c[2:4], 16)};{int(c[4:6], 16)}m{c}\x1b[0m' for n, c in self.colours.items())}"
         )
-
-    def read_colours_from_file(self, path: Path) -> dict[str, str]:
-        return {k.strip(): v.strip() for k, v in (line.split(" ") for line in path.read_text().splitlines())}
 
 
 scheme_variants = [
