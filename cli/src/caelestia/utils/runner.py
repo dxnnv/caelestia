@@ -19,6 +19,8 @@ def check_bytes(cmd: Sequence[StrPath], **kw) -> bytes:
 
 def run(cmd: Sequence[str], **kw) -> int:
     installed(cmd[0])
+    if "input" in kw and isinstance(kw["input"], str):
+        kw.setdefault("text", True)
     return subprocess.run(cmd, **kw).returncode
 
 
