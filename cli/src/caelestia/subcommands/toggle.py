@@ -2,13 +2,16 @@ import contextlib
 import json
 import shlex
 import shutil
+import time
 from argparse import ArgumentParser
 from collections import ChainMap
 from collections.abc import Callable, Mapping
+from pathlib import Path
 from typing import Any, NotRequired, TypedDict, cast
 
 from caelestia.command import BaseCommand, register
 from caelestia.utils import hypr
+from caelestia.utils.close_guard import close_guard_active, close_guard_set
 from caelestia.utils.paths import user_config_path
 
 
@@ -32,27 +35,53 @@ class Client(TypedDict):
     class_: NotRequired[str]
 
 
+class ConfigEntry(TypedDict, total=False):
+    enable: bool
+    match: list[Mapping[str, Any]]
+    command: list[str]
+    move: bool
+
+
+def lookup(superset: Mapping[str, Any], key: str):
+    if key in superset:
+        return superset[key]
+    aliases = {
+        "class": ["initialClass"],
+        "initialClass": ["class"],
+        "title": ["initialTitle"],
+        "initialTitle": ["title"],
+        "app_id": ["class"],
+    }
+    for alt in aliases.get(key, []):
+        if alt in superset:
+            return superset[alt]
+    raise KeyError(key)
+
+
 def is_subset(subset: Mapping[str, Any], superset: Mapping[str, Any]) -> bool:
     for key, value in subset.items():
-        if key not in superset:
+        try:
+            superval = lookup(superset, key)
+        except KeyError:
             return False
 
-        if isinstance(value, dict):
-            if not is_subset(superset[key], value):
+        if isinstance(value, Mapping):
+            if not isinstance(superval, Mapping) or not is_subset(value, superval):
                 return False
 
         elif isinstance(value, str):
-            if value not in superset[key]:
+            if not isinstance(superval, str) or value.lower() not in superval.lower():
                 return False
 
         elif isinstance(value, list):
-            if not set(value) <= set(superset[key]):
-                return False
-        elif isinstance(value, set):
-            if not value <= superset[key]:
+            if not isinstance(superval, list) or not set(value) <= set(superval):
                 return False
 
-        elif value != superset[key]:
+        elif isinstance(value, set):
+            if not isinstance(superval, set) or not value <= superval:
+                return False
+
+        elif value != superval:
             return False
 
     return True
@@ -79,10 +108,23 @@ def specialws() -> None:
     hypr.dispatch("togglespecialworkspace", special[8:] or "special")
 
 
+def _special(name: str) -> str:
+    return name if name.startswith("special:") else f"special:{name}"
+
+
+def _is_special_visible_any(name: str) -> bool:
+    want = _special(name)
+    for m in cast(list[Monitor], hypr.message("monitors")):
+        sp = m.get("specialWorkspace", {})
+        if (sp.get("name") or "") == want:
+            return True
+    return False
+
+
 def _configure(sub: ArgumentParser) -> None:
-    sub.description = "Toggle Caelestia/Hyprland features (e.g., special workspaces)."
+    sub.description = "Toggle Caelestia + Hyprland special workspaces"
     sub.add_argument(
-        "target",
+        "workspace",
         help="Thing to toggle (e.g., communication, notes, music, sysmon, todo, etc.)",
     )
     sub.add_argument(
@@ -92,51 +134,18 @@ def _configure(sub: ArgumentParser) -> None:
     )
 
 
-@register("toggle", help="Toggle features (e.g., special workspaces)", configure_parser=_configure)
+@register("toggle", help="Toggle Caelestia + Hyprland special workspaces", configure_parser=_configure)
 class Command(BaseCommand):
-    cfg: dict[str, dict[str, dict[str, Any]]] | DeepChainMap
-    clients: str | dict[str, Any] | None = None
+    cfg: dict[str, dict[str, ConfigEntry]] | DeepChainMap
 
-    def __init__(self, _) -> None:
+    def __init__(self, args) -> None:
+        super().__init__(args)
         self.cfg = {
             "communication": {
                 "discord": {
                     "enable": True,
                     "match": [{"class": "discord"}],
                     "command": ["discord"],
-                    "move": True,
-                },
-                "whatsapp": {
-                    "enable": True,
-                    "match": [{"class": "whatsapp"}],
-                    "move": True,
-                },
-            },
-            "music": {
-                "spotify": {
-                    "enable": True,
-                    "match": [{"class": "Spotify"}, {"initialTitle": "Spotify"}, {"initialTitle": "Spotify Free"}],
-                    "command": ["spicetify", "watch", "-s"],
-                    "move": True,
-                },
-                "feishin": {
-                    "enable": True,
-                    "match": [{"class": "feishin"}],
-                    "move": True,
-                },
-            },
-            "sysmon": {
-                "btop": {
-                    "enable": True,
-                    "match": [{"class": "btop", "title": "btop", "workspace": {"name": "special:sysmon"}}],
-                    "command": ["foot", "-a", "btop", "-T", "btop", "fish", "-C", "exec btop"],
-                },
-            },
-            "todo": {
-                "todoist": {
-                    "enable": True,
-                    "match": [{"class": "Todoist"}],
-                    "command": ["todoist"],
                     "move": True,
                 },
             },
@@ -149,43 +158,77 @@ class Command(BaseCommand):
             specialws()
             return
 
-        spawned = False
-        if self.args.workspace in self.cfg:
-            for client in self.cfg[self.args.workspace].values():
-                if "enable" in client and client["enable"] and self.handle_client_config(client):
-                    spawned = True
+        target_name = self.args.workspace
+        special_ws = _special(target_name)
+        was_visible = _is_special_visible_any(target_name)
+        did_work = False
+        opening = not was_visible
 
-        if not spawned:
-            hypr.dispatch("togglespecialworkspace", self.args.workspace)
+        if target_name in self.cfg:
+            for entry in cast(dict[str, ConfigEntry], self.cfg[target_name]).values():
+                if entry.get("enable"):
+
+                    def selector(c: Client) -> bool:
+                        return any(is_subset(c, m) for m in list(entry.get("match", [])))
+
+                    cmd = entry.get("command")
+                    if opening and not close_guard_active(target_name):
+                        if cmd and self.spawn_client(selector, cmd):
+                            did_work = True
+                        if entry.get("move") and self.move_client(selector, target_name):
+                            did_work = True
+
+        if opening or not did_work:
+            hypr.dispatch("togglespecialworkspace", target_name)
+            time.sleep(0.10)
+            if not opening:
+                close_guard_set(target_name)
+
+        if did_work and opening:
+            for client in self.get_clients():
+                if client["workspace"]["name"] == special_ws:
+                    hypr.dispatch("focuswindow", f"address:{client['address']}")
+                    break
 
     def get_clients(self) -> list[Client]:
         return cast(list[Client], hypr.message("clients"))
 
-    def move_client(self, selector: Callable[[Client], bool], workspace: str) -> None:
+    def move_client(self, selector: Callable[[Client], bool], workspace: str) -> bool:
+        moved = False
         for client in self.get_clients():
-            if selector(client) and client["workspace"]["name"] != f"special:{workspace}":
-                hypr.dispatch(
-                    "movetoworkspacesilent",
-                    f"special:{workspace},address:{client['address']}",
-                )
+            if selector(client) and client["workspace"]["name"] != _special(workspace):
+                hypr.dispatch("movetoworkspacesilent", f"{_special(workspace)},address:{client['address']}")
+                moved = True
+        return moved
 
     def spawn_client(self, selector: Callable, spawn: list[str]) -> bool:
-        if (spawn[0].endswith(".desktop") or shutil.which(spawn[0])) and not any(
-            selector(client) for client in self.get_clients()
-        ):
-            hypr.dispatch("exec", f"[workspace special:{self.args.workspace}] app2unit -- {shlex.join(spawn)}")
-            return True
-        return False
+        if close_guard_active(self.args.workspace):
+            return False
+        if any(selector(c) for c in self.get_clients()):
+            return False
 
-    def handle_client_config(self, client: dict[str, Any]) -> bool:
-        def selector(c: Client) -> bool:
-            # Each match is or, inside matches is and
-            return any(is_subset(c, match) for match in client["match"])
+        exe = spawn[0]
+        have_bin = exe.endswith(".desktop") or shutil.which(exe)
+        if not have_bin:
+            return False
 
-        spawned = False
-        if client.get("command"):
-            spawned = self.spawn_client(selector, client["command"])
-        if client.get("move"):
-            self.move_client(selector, self.args.workspace)
+        if shutil.which("systemd-run"):
+            unit = f"cae-{Path(exe).stem}-{int(time.time())}"
+            argv = [
+                "systemd-run",
+                "--user",
+                "--unit",
+                unit,
+                "--quiet",
+                "--collect",
+                "--property=KillMode=process",
+                "--same-dir",
+                "--",
+                *spawn,
+            ]
+        else:
+            argv = ["setsid", "-f", "--", *spawn]
 
-        return spawned
+        hypr_cmd = f"[workspace special:{self.args.workspace} silent] {shlex.join(argv)}"
+        hypr.dispatch("exec", hypr_cmd + " </dev/null >/dev/null 2>&1")
+        return True

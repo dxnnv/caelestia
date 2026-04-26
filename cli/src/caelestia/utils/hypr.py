@@ -4,7 +4,7 @@ import socket
 from typing import Any
 
 
-def _socket_paths() -> tuple[str, str]:
+def socket_paths() -> tuple[str, str]:
     xdg = os.getenv("XDG_RUNTIME_DIR")
     sig = os.getenv("HYPRLAND_INSTANCE_SIGNATURE")
     if not xdg or not sig:
@@ -14,7 +14,7 @@ def _socket_paths() -> tuple[str, str]:
 
 
 def message(msg: str, json: bool = True) -> str | dict[str, Any]:
-    sock_path, _ = _socket_paths()
+    sock_path, _ = socket_paths()
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
         sock.connect(sock_path)
 
