@@ -6,6 +6,8 @@ import Quickshell
 import Quickshell.Services.SystemTray
 import QtQuick
 
+import "../components" as Comp
+
 Item {
     id: root
 
@@ -58,6 +60,17 @@ Item {
         Popout {
             name: "lockstatus"
             source: "LockStatus.qml"
+        }
+
+        Popout {
+            name: "github"
+            sourceComponent: Github {
+                wrapper: root.wrapper
+                days: Comp.GithubStore.days
+                total: Comp.GithubStore.total
+                username: Comp.GithubStore.username
+                lastError: Comp.GithubStore.lastError
+            }
         }
 
         Repeater {

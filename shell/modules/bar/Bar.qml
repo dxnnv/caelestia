@@ -72,6 +72,10 @@ RowLayout {
             popouts.currentName = id.toLowerCase();
             popouts.currentCenter = item.mapToItem(root, itemWidth / 2, 0).x;
             popouts.hasCurrent = true;
+        } else if (id === "github") {
+            popouts.currentName = "github";
+            popouts.currentCenter = Qt.binding(() => ch.mapToItem(root, ch.width / 2, 0).x);
+            popouts.hasCurrent = true;
         }
     }
 
@@ -139,6 +143,15 @@ RowLayout {
                     sourceComponent: ActiveWindow {
                         bar: root
                         monitor: root.screen ? (Brightness.getMonitorForScreen(root.screen) ?? null) : null
+                    }
+                }
+            }
+            DelegateChoice {
+                id: github
+                roleValue: "github"
+                delegate: WrappedLoader {
+                    sourceComponent: GithubActivity {
+                        wrapper: root.popouts
                     }
                 }
             }
