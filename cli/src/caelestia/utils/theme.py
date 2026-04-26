@@ -1,7 +1,9 @@
 import contextlib
 import json
 import re
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 import caelestia.utils.runner as runner
@@ -104,7 +106,11 @@ def gen_sequences(colours: dict[str, str]) -> str:
 
 def write_file(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content)
+
+    with tempfile.NamedTemporaryFile("w") as f:
+        f.write(content)
+        f.flush()
+        shutil.move(f.name, path)
 
 
 @log_exception
