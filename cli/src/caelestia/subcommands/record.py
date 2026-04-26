@@ -6,6 +6,7 @@ import subprocess
 import time
 from argparse import ArgumentParser
 from datetime import datetime
+from pathlib import Path
 
 import caelestia.utils.runner as runner
 from caelestia.command import BaseCommand, register
@@ -28,6 +29,7 @@ def _configure(sub: ArgumentParser) -> None:
     act.add_argument("--start", action="store_true", help="Start recording")
     act.add_argument("--stop", action="store_true", help="Stop recording")
     act.add_argument("--pause", action="store_true", help="Pause recording")
+    act.add_argument("-c", "--clipboard", action="store_true", help="copy recording path to clipboard")
     act.add_argument("--resume", action="store_true", help="Resume recording")
     sub.add_argument("--region", metavar="WxH+X+Y", help="Region to record")
     sub.add_argument("--fps", type=int, default=60, help="Frames per second")
@@ -117,6 +119,10 @@ class Command(BaseCommand):
         # Close start notification
         with contextlib.suppress(IOError):
             close_notification(recording_notif_path.read_text())
+
+        if self.args.clipboard:
+            file_uri = Path(new_path).resolve().as_uri() + "\n"
+            subprocess.run(["wl-copy", "--type", "text/uri-list"], input=file_uri.encode())
 
         action = notify(
             "--action=watch=Watch",
