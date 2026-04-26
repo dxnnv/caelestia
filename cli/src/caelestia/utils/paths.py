@@ -11,41 +11,41 @@ def _env_path(name: str, default: Path) -> Path:
     return Path(os.getenv(name, str(default))).expanduser()
 
 
-config_dir = _env_path("XDG_CONFIG_HOME", Path.home() / ".config")
-data_dir = _env_path("XDG_DATA_HOME", Path.home() / ".local" / "share")
-state_dir = _env_path("XDG_STATE_HOME", Path.home() / ".local" / "state")
-cache_dir = _env_path("XDG_CACHE_HOME", Path.home() / ".cache")
+config_dir: Path = _env_path("XDG_CONFIG_HOME", Path.home() / ".config")
+data_dir: Path = _env_path("XDG_DATA_HOME", Path.home() / ".local" / "share")
+state_dir: Path = _env_path("XDG_STATE_HOME", Path.home() / ".local" / "state")
+cache_dir: Path = _env_path("XDG_CACHE_HOME", Path.home() / ".cache")
 
-pictures_dir = _env_path("XDG_PICTURES_DIR", Path.home() / "Pictures")
-videos_dir = _env_path("XDG_VIDEOS_DIR", Path.home() / "Videos")
+pictures_dir: Path = _env_path("XDG_PICTURES_DIR", Path.home() / "Pictures")
+videos_dir: Path = _env_path("XDG_VIDEOS_DIR", Path.home() / "Videos")
 
-c_config_dir = config_dir / "caelestia"
-c_data_dir = data_dir / "caelestia"
-c_state_dir = state_dir / "caelestia"
-c_cache_dir = cache_dir / "caelestia"
+c_config_dir: Path = config_dir / "caelestia"
+c_data_dir: Path = data_dir / "caelestia"
+c_state_dir: Path = state_dir / "caelestia"
+c_cache_dir: Path = cache_dir / "caelestia"
 
-user_config_path = c_config_dir / "cli.json"
-cli_data_dir = Path(__file__).parent.parent / "data"
-templates_dir = cli_data_dir / "templates"
-user_templates_dir = c_config_dir / "templates"
-theme_dir = c_state_dir / "theme"
+user_config_path: Path = c_config_dir / "cli.json"
+cli_data_dir: Path = Path(__file__).parent.parent / "data"
+templates_dir: Path = cli_data_dir / "templates"
+user_templates_dir: Path = c_config_dir / "templates"
+theme_dir: Path = c_state_dir / "theme"
 
-scheme_path = c_state_dir / "scheme.json"
-scheme_data_dir = cli_data_dir / "schemes"
-scheme_cache_dir = c_cache_dir / "schemes"
+scheme_path: Path = c_state_dir / "scheme.json"
+scheme_data_dir: Path = cli_data_dir / "schemes"
+scheme_cache_dir: Path = c_cache_dir / "schemes"
 
-wallpapers_dir = _env_path("CAELESTIA_WALLPAPERS_DIR", pictures_dir / "Wallpapers")
-wallpaper_path_path = c_state_dir / "wallpaper" / "path.txt"
-wallpaper_link_path = c_state_dir / "wallpaper" / "current"
-wallpaper_thumbnail_path = c_state_dir / "wallpaper" / "thumbnail.jpg"
-wallpapers_cache_dir = c_cache_dir / "wallpapers"
+wallpapers_dir: Path = _env_path("CAELESTIA_WALLPAPERS_DIR", pictures_dir / "Wallpapers")
+wallpaper_path_path: Path = c_state_dir / "wallpaper" / "path.txt"
+wallpaper_link_path: Path = c_state_dir / "wallpaper" / "current"
+wallpaper_thumbnail_path: Path = c_state_dir / "wallpaper" / "thumbnail.jpg"
+wallpapers_cache_dir: Path = c_cache_dir / "wallpapers"
 
-screenshots_dir = _env_path("CAELESTIA_SCREENSHOTS_DIR", pictures_dir / "Screenshots")
-screenshots_cache_dir = c_cache_dir / "screenshots"
+screenshots_dir: Path = _env_path("CAELESTIA_SCREENSHOTS_DIR", pictures_dir / "Screenshots")
+screenshots_cache_dir: Path = c_cache_dir / "screenshots"
 
-recordings_dir = _env_path("CAELESTIA_RECORDINGS_DIR", videos_dir / "Recordings")
-recording_path = c_state_dir / "record" / "recording.mp4"
-recording_notif_path = c_state_dir / "record" / "notifid.txt"
+recordings_dir: Path = _env_path("CAELESTIA_RECORDINGS_DIR", videos_dir / "Recordings")
+recording_path: Path = c_state_dir / "record" / "recording.mp4"
+recording_notif_path: Path = c_state_dir / "record" / "notifid.txt"
 
 
 def ensure_parent(path: Path) -> None:

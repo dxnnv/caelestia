@@ -38,8 +38,8 @@ class Scheme:
     _default: bool
     notify: bool
 
-    def __init__(self, jsondict: dict[str, Any] | None) -> None:
-        if jsondict is None:
+    def __init__(self, scheme_json: dict[str, Any] | None) -> None:
+        if scheme_json is None:
             self._name = "catppuccin"
             self._flavour = "mocha"
             self._mode = "dark"
@@ -47,11 +47,11 @@ class Scheme:
             self._colours = read_colours_from_file(self.get_colours_path())
             self._default = True
         else:
-            self._name = jsondict["name"]
-            self._flavour = jsondict["flavour"]
-            self._mode = jsondict["mode"]
-            self._variant = jsondict["variant"]
-            self._colours = jsondict["colours"]
+            self._name = scheme_json["name"]
+            self._flavour = scheme_json["flavour"]
+            self._mode = scheme_json["mode"]
+            self._variant = scheme_json["variant"]
+            self._colours = scheme_json["colours"]
             self._default = False
         self.notify = False
 
@@ -262,8 +262,8 @@ def get_scheme_names() -> list[str]:
     return [*(f.name for f in scheme_data_dir.iterdir() if f.is_dir()), "dynamic"]
 
 
-def get_scheme_flavours(name: str = "") -> list[str]:
-    if name == "":
+def get_scheme_flavours(name: str | None = None) -> list[str]:
+    if name is None:
         name = get_scheme().name
 
     return (
@@ -271,11 +271,11 @@ def get_scheme_flavours(name: str = "") -> list[str]:
     )
 
 
-def get_scheme_modes(name: str = "", flavour: str = "") -> list[str]:
-    if name == "":
-        schm = get_scheme()
-        name = schm.name
-        flavour = schm.flavour
+def get_scheme_modes(name: str | None = None, flavour: str | None = None) -> list[str]:
+    if name is None or flavour is None:
+        scheme = get_scheme()
+        name = name or scheme.name
+        flavour = flavour or scheme.flavour
 
     if name == "dynamic":
         return ["light", "dark"]

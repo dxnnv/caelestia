@@ -1,4 +1,4 @@
-import json as j
+import json
 import os
 import socket
 from typing import Any
@@ -13,12 +13,12 @@ def socket_paths() -> tuple[str, str]:
     return f"{base}/.socket.sock", f"{base}/.socket2.sock"
 
 
-def message(msg: str, json: bool = True) -> str | dict[str, Any]:
+def message(msg: str, is_json: bool = True) -> str | dict[str, Any]:
     sock_path, _ = socket_paths()
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as sock:
         sock.connect(sock_path)
 
-        if json:
+        if is_json:
             msg = f"j/{msg}"
         sock.send(msg.encode())
 
@@ -29,13 +29,13 @@ def message(msg: str, json: bool = True) -> str | dict[str, Any]:
                 break
             resp.append(chunk)
         data = b"".join(resp).decode()
-        return j.loads(data) if json else data
+        return json.loads(data) if is_json else data
 
 
-def dispatch(dispatcher: str, *args: Any) -> bool:
-    return message(f"dispatch {dispatcher} {' '.join(map(str, args))}".rstrip(), json=False) == "ok"
+def dispatch(dispatcher: str, *args: str) -> bool:
+    return message(f"dispatch {dispatcher} {' '.join(map(str, args))}".rstrip(), is_json=False) == "ok"
 
 
 def batch(*msgs: str, json: bool = False) -> str | dict[str, Any]:
     msgs = tuple((f"j/{m.strip()}" if json else m.strip()) for m in msgs)
-    return message(f"[[BATCH]]{';'.join(msgs)}", json=False)
+    return message(f"[[BATCH]]{';'.join(msgs)}", is_json=False)

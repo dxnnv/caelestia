@@ -5,9 +5,9 @@ import shutil
 import time
 from argparse import ArgumentParser
 from collections import ChainMap
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, NotRequired, TypedDict, cast
+from typing import Any, Callable, NotRequired, TypedDict, cast
 
 from caelestia.command import BaseCommand, register
 from caelestia.utils import hypr

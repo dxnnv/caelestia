@@ -5,12 +5,13 @@ import random
 import subprocess
 from argparse import Namespace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from materialyoucolor.hct import Hct
 from materialyoucolor.utils.color_utils import argb_from_rgb
 from PIL import Image
 
+from caelestia.utils.colourfulness import get_variant
 from caelestia.utils.hypr import message
 from caelestia.utils.material import get_colours_for_image
 from caelestia.utils.paths import (
@@ -79,7 +80,7 @@ def get_wallpapers(args: Namespace) -> list[Path]:
     if args.no_filter:
         return walls
 
-    monitors: dict[Any, Any] = message("monitors")
+    monitors = cast(list[dict[str, int]], message("monitors"))
     filter_size = min(m["width"] for m in monitors), min(m["height"] for m in monitors)
     return [f for f in walls if check_wall(f, filter_size, args.threshold)]
 
@@ -95,7 +96,7 @@ def get_thumb(wall: Path, cache: Path) -> Path:
     return thumb
 
 
-def get_smart_opts(wall: Path, cache: Path) -> dict[Any, Any]:
+def get_smart_opts(wall: Path, cache: Path) -> dict:
     opts_cache = cache / "smart.json"
     with contextlib.suppress(IOError, json.JSONDecodeError):
         return json.loads(opts_cache.read_text())
@@ -105,7 +106,11 @@ def get_smart_opts(wall: Path, cache: Path) -> dict[Any, Any]:
     with Image.open(get_thumb(wall, cache)) as img:
         opts: dict[str, Any] = {"variant": get_variant(img)}
         img.thumbnail((1, 1), Image.Resampling.LANCZOS)
-        hct = Hct.from_int(argb_from_rgb(*img.getpixel((0, 0))))
+
+        # Cast the pixel to a tuple of 3 integers to safely unpack it
+        pixel = cast(tuple[int, int, int], img.getpixel((0, 0)))
+
+        hct = Hct.from_int(argb_from_rgb(pixel))
         opts["mode"] = "light" if hct.tone > 60 else "dark"
 
     opts_cache.parent.mkdir(parents=True, exist_ok=True)
@@ -162,7 +167,7 @@ def convert_gif(wall: Path) -> Path:
     return output_path
 
 
-def set_wallpaper(wall: Path | str, no_smart: bool) -> None:
+def set_wallpaper(wall: Path, no_smart: bool) -> None:
     wall = Path(wall).expanduser().resolve()
 
     if not is_valid_image(wall):
