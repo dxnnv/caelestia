@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import qs.components
 import qs.config
+import qs.services as Services
 import Quickshell
 import Quickshell.Services.SystemTray
 import QtQuick
@@ -75,7 +76,7 @@ Item {
 
         Repeater {
             model: ScriptModel {
-                values: [...SystemTray.items.values]
+                values: [...SystemTray.items.values].filter(item => !Services.TrayFilter.shouldHide(item))
             }
 
             Popout {
