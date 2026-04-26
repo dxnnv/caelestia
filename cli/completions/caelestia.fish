@@ -71,29 +71,79 @@ complete -c caelestia -n "$seen shell && $seen notifs && not $seen clear" -a 'cl
 set -l commands communication music specialws sysmon todo notes
 complete -c caelestia -n "$seen toggle && not $seen drawers && not $seen $commands" -a "$commands" -d 'toggle'
 
+
+# -- helpers for dynamic "scheme" completions -------------------------------
+function __caelestia_list_names
+    caelestia scheme list --names 2>/dev/null
+end
+
+function __caelestia_optval --argument opt
+    # Return the value for a long option like --name or --flavour
+    set -l toks (commandline -opc)
+    for i in (seq (count $toks))
+        set -l t $toks[$i]
+        if string match -q -- "$opt=*"
+            string split -m1 -f2 '=' -- $t
+            return
+        end
+        if test "$t" = "$opt"
+            if test (math $i + 1) -le (count $toks)
+                set -l nxt $toks[(math $i + 1)]
+                if not string match -q -- '--*' "$nxt"
+                    echo $nxt
+                end
+            end
+            return
+        end
+    end
+end
+
+function __caelestia_list_flavours
+    set -l nm (__caelestia_optval --name)
+    if test -n "$nm"
+        caelestia scheme list --flavours $nm 2>/dev/null
+    end
+end
+
+function __caelestia_list_modes
+    set -l nm (__caelestia_optval --name)
+    set -l fl (__caelestia_optval --flavour)
+    if test -n "$nm" -a -n "$fl"
+        caelestia scheme list --modes $nm $fl 2>/dev/null
+    else if test -n "$nm"
+        caelestia scheme list --modes $nm 2>/dev/null
+    else
+        caelestia scheme list --modes 2>/dev/null
+    end
+end
+
+function __caelestia_list_variants
+    caelestia scheme list --variants 2>/dev/null
+end
+# --------------------------------------------------------------------------
+
 # Scheme
 set -l commands list get set
 set -l not_seen "$seen scheme && not $seen $commands"
-complete -c caelestia -n $not_seen -a 'list' -d 'List available schemes'
-complete -c caelestia -n $not_seen -a 'get' -d 'Get scheme properties'
-complete -c caelestia -n $not_seen -a 'set' -d 'Set the current scheme'
+complete -c caelestia -f -n $not_seen -a 'list' -d 'List available schemes'
+complete -c caelestia -f -n $not_seen -a 'get' -d 'Get scheme properties'
+complete -c caelestia -f -n $not_seen -a 'set' -d 'Set the current scheme'
 
-complete -c caelestia -n "$seen scheme && $seen list" -s 'n' -l 'names' -d 'List scheme names'
-complete -c caelestia -n "$seen scheme && $seen list" -s 'f' -l 'flavours' -d 'List scheme flavours'
-complete -c caelestia -n "$seen scheme && $seen list" -s 'm' -l 'modes' -d 'List scheme modes'
-complete -c caelestia -n "$seen scheme && $seen list" -s 'v' -l 'variants' -d 'List scheme variants'
+# scheme list
+complete -c caelestia -f -n "$seen scheme && $seen list" -l 'names'    -d 'List scheme names'
+complete -c caelestia -f -n "$seen scheme && $seen list" -l 'flavours' -d 'List scheme flavours' -r -a '(__caelestia_list_names)'
+complete -c caelestia -f -n "$seen scheme && $seen list" -l 'modes'    -d 'List modes (optional NAME [FLAVOUR])'
+complete -c caelestia -f -n "$seen scheme && $seen list" -l 'variants' -d 'List scheme variants'
+complete -c caelestia -f -n "$seen scheme && $seen list" -l 'json'     -d 'Output JSON'
 
-complete -c caelestia -n "$seen scheme && $seen get" -s 'n' -l 'name' -d 'Get scheme name'
-complete -c caelestia -n "$seen scheme && $seen get" -s 'f' -l 'flavour' -d 'Get scheme flavour'
-complete -c caelestia -n "$seen scheme && $seen get" -s 'm' -l 'mode' -d 'Get scheme mode'
-complete -c caelestia -n "$seen scheme && $seen get" -s 'v' -l 'variant' -d 'Get scheme variant'
+# scheme set
+complete -c caelestia -f -n "$seen scheme && $seen set" -l 'notify' -d 'Send a notification after applying'
+complete -c caelestia -f -n "$seen scheme && $seen set" -l 'random' -d 'Switch to a random scheme'
 
-complete -c caelestia -n "$seen scheme && $seen set" -l 'notify' -d 'Send a notification on error'
-complete -c caelestia -n "$seen scheme && $seen set" -s 'r' -l 'random' -d 'Switch to a random scheme'
-complete -c caelestia -n "$seen scheme && $seen set" -s 'n' -l 'name' -d 'Set scheme name' -a "$(caelestia scheme list -n)" -r
-complete -c caelestia -n "$seen scheme && $seen set" -s 'f' -l 'flavour' -d 'Set scheme flavour' -a "$(caelestia scheme list -f)" -r
-complete -c caelestia -n "$seen scheme && $seen set" -s 'm' -l 'mode' -d 'Set scheme mode' -a "$(caelestia scheme list -m)" -r
-complete -c caelestia -n "$seen scheme && $seen set" -s 'v' -l 'variant' -d 'Set scheme variant' -a "$(caelestia scheme list -v)" -r
+complete -c caelestia -f -n "$seen scheme && $seen set" -l 'name'    -d 'Set scheme name'    -r -a '(__caelestia_list_names)'
+complete -c caelestia -f -n "$seen scheme && $seen set" -l 'flavour' -d 'Set scheme flavour' -r -a '(__caelestia_list_flavours)'
+complete -c caelestia -f -n "$seen scheme && $seen set" -l 'mode'    -d 'Set scheme mode'    -r -a '(__caelestia_list_modes)'
+complete -c caelestia -f -n "$seen scheme && $seen set" -l 'variant' -d 'Set scheme variant' -r -a '(__caelestia_list_variants)'
 
 # Screenshot
 complete -c caelestia -n "$seen screenshot" -s 'r' -l 'region' -d 'Capture region'
