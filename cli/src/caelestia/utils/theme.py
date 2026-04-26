@@ -62,7 +62,7 @@ def gen_replace_dynamic(colours: dict[str, str], template: Path, mode: str) -> s
     template_content = template.read_text()
 
     template_filled = re.sub(dotField, fill_colour, template_content)
-    template_filled = re.sub(modeField, mode, template_content)
+    template_filled = re.sub(modeField, mode, template_filled)
 
     return template_filled
 
