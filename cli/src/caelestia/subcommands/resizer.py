@@ -242,8 +242,6 @@ def _apply_window_actions(window_id: str, width: str, height: str, actions: list
 def _load_window_rules() -> list[WindowRule]:
     default_rules = [
         WindowRule("(Bitwarden", "titleContains", "20%", "54%", ["float", "center"]),
-        WindowRule("Sign in - Google Accounts", "titleContains", "35%", "65%", ["float", "center"]),
-        WindowRule("oauth", "titleContains", "30%", "60%", ["float", "center"]),
         WindowRule("^[Pp]icture(-| )in(-| )[Pp]icture$", "titleRegex", "", "", ["pip"]),
     ]
 
