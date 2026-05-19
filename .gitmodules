@@ -1,0 +1,6 @@
+[submodule "shell"]
+	path = shell
+	url = https://github.com/dxnnv/caelestia-shell.git
+[submodule "cli"]
+	path = cli
+	url = https://github.com/dxnnv/caelestia-cli.git
