@@ -1,0 +1,104 @@
+#!/usr/bin/env fish
+
+function usage
+  printf '%s\n' \
+    'Usage: scripts/lint-shell [OPTIONS]' \
+    '' \
+    'Run the shell formatting and lint checks.' \
+    '' \
+    'Options:' \
+    '  --only-check    Only run checks; do not build or lint QML' \
+    '  --no-cpp        Do not audit C++ files' \
+    '  -h, --help      Show this help'
+end
+
+set -g repo_root (realpath (dirname (status current-filename))/..)
+set -g shell_dir "$repo_root/shell"
+set -g build_dir "$shell_dir/build"
+
+set -g only_check false
+set -g no_cpp false
+
+function check_qml
+  cd "$shell_dir"; or return 1
+  
+  for file in (string match -v "build/*" **.qml)
+    /usr/lib/qt6/bin/qmlformat $file | diff -u $file - || return 1
+  end
+  
+  python3 "$shell_dir/scripts/qml-lint-conventions.py"; or return 1
+end
+
+function check_cpp
+  cd "$shell_dir"; or return 1
+
+  find plugin extras -name '*.cpp' -o -name '*.hpp' \
+    | xargs clang-format --dry-run --Werror
+end
+
+function build
+  # Set version and git rev for CI build so we don't call git
+  cmake -S "$shell_dir" -B "$build_dir" -G Ninja -DCMAKE_CXX_COMPILER=clazy -DCMAKE_CXX_FLAGS=-Werror -DVERSION= -DGIT_REVISION=; or return 1
+  cmake --build "$build_dir" -j "$(nproc)"; or return 1 
+end
+
+function lint_qml
+  cd "$shell_dir"; or return 1
+
+  # Generate tooling
+  touch .qmlls.ini
+
+  # Set environment
+  set -l qml_import_path "$PWD/build/qml:$HOME/.local/lib/qt6/qml:/usr/lib/qt6/qml"
+
+  QML_DISABLE_DISK_CACHE=1 \
+    QML_IMPORT_PATH="$qml_import_path" \
+    QML2_IMPORT_PATH="$qml_import_path" \
+    QT_PLUGIN_PATH="/usr/lib/qt6/plugins" \
+    QT_QPA_PLATFORM=offscreen \
+    timeout 2 qs -p .
+
+  # Construct linter args
+  set -l build_dir (grep -oP "(?<=buildDir=\")(.*)(?=\")" .qmlls.ini)
+  set -l import_paths (grep -oP "(?<=importPaths=\")(.*)(?=\")" .qmlls.ini | string split :)
+  set -l args -I $build_dir
+  for path in $import_paths
+    set -a args -I $path
+  end
+  set -l qml_files (string match -vr '(build|modules/controlcenter)/.*' **.qml)
+
+  # Lint
+  set -l lint_out (QML_DISABLE_DISK_CACHE=1 \
+    QML_IMPORT_PATH="$qml_import_path" \
+    QML2_IMPORT_PATH="$qml_import_path" \
+    QT_PLUGIN_PATH="/usr/lib/qt6/plugins" \
+    /usr/lib/qt6/bin/qmllint --bare --import disable $args $qml_files 2>&1 | tee /dev/stderr)
+  test -z "$lint_out" || return 1
+end
+
+for arg in $argv
+  switch $arg
+    case --only-check
+      set only_check true
+    case --no-cpp
+      set no_cpp true
+    case -h --help
+      usage
+      exit 0
+    case '*'
+      echo "Unknown option: $arg" >&2
+      usage >&2
+      exit 2
+  end
+end
+
+check_qml; or exit 1
+
+if test $no_cpp = false
+  check_cpp; or exit 1
+end
+
+if test $only_check = false
+  build; or exit 1
+  lint_qml; or exit 1
+end

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+shell_dir="$repo_root/shell"
+build_dir="$shell_dir/build"
+
+usage() {
+  cat <<'EOF'
+Usage: ./scripts/build-shell [OPTIONS] [BUILD_ARGS...]
+
+Configure and build the shell.
+
+Options:
+  --clean       Remove the existing shell build directory before building
+  -h, --help    Show this help
+
+Any remaining arguments are passed to cmake --build.
+EOF
+}
+
+clean=false
+build_args=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --clean)
+      clean=true
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      build_args+=("$1")
+      ;;
+  esac
+  shift
+done
+
+if [[ "$clean" == true ]]; then
+  systemctl --user stop caelestia.service 2>/dev/null || true
+  if [[ -d "$build_dir" && ! -O "$build_dir" ]]; then
+    sudo chown -R "$USER:$USER" "$build_dir"
+  fi
+  rm -rf "$build_dir"
+fi
+
+if [[ ! -f "$build_dir/build.ninja" ]]; then
+  cmake -S "$shell_dir" -B "$build_dir" -G Ninja \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+fi
+
+cmake --build "$build_dir" -j"$(nproc)" "${build_args[@]}"

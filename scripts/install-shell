@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+build_dir="$repo_root/shell/build"
+
+usage() {
+  cat <<'EOF'
+Usage: ./scripts/install-shell [OPTIONS] [BUILD_ARGS...]
+
+Build and install the shell.
+
+Options:
+  --clean           Remove the existing shell build directory before building
+  --no-build        Install the existing build without rebuilding
+  -h, --help        Show this help
+
+Any remaining arguments are passed to ./scripts/build-shell.
+EOF
+}
+
+no_build=false
+clean=false
+build_args=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --no-build)
+      no_build=true
+      ;;
+    --clean)
+      clean=true
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      build_args+=("$1")
+      ;;
+  esac
+  shift
+done
+
+if [[ "$no_build" == true && "$clean" == true ]]; then
+  echo "--clean cannot be used with --no-build." >&2
+  exit 2
+fi
+
+if [[ "$no_build" != true ]]; then
+  if [[ "$clean" == true ]]; then
+    "$repo_root/scripts/build-shell" --clean "${build_args[@]}"
+  else
+    "$repo_root/scripts/build-shell" "${build_args[@]}"
+  fi
+fi
+
+prefix="/usr/local"
+if [[ -f "$build_dir/CMakeCache.txt" ]]; then
+  prefix="$(sed -n 's/^CMAKE_INSTALL_PREFIX:PATH=//p' "$build_dir/CMakeCache.txt" | tail -n 1)"
+fi
+
+install_output=""
+if [[ "$prefix" == "$HOME"* || "$prefix" == /home/* ]]; then
+  install_output="$(cmake --install "$build_dir" 2>&1)"
+else
+  install_output="$(sudo cmake --install "$build_dir" 2>&1)"
+fi
+
+if [[ -n "$install_output" ]]; then
+  printf '%s\n' "$install_output" | grep -v Up-to-date || true
+fi
+
+"$repo_root/scripts/restart-shell"

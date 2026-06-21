@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Usage: scripts/install-cli [OPTIONS]
+
+Build and install the local CLI into the uv tool environment used by ~/.local/bin/caelestia.
+
+Options:
+  --no-clean      Do not remove cli/dist before building
+  --no-restart    Do not restart the Caelestia shell after installing
+  -h, --help      Show this help
+EOF
+}
+
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cli_dir="$repo_root/cli"
+dist_dir="$cli_dir/dist"
+
+clean=true
+restart_shell=true
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --no-clean)
+      clean=false
+      ;;
+    --no-restart)
+      restart_shell=false
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
+
+command -v uv >/dev/null || {
+  echo "uv is required because the active caelestia command is installed as a uv tool." >&2
+  exit 1
+}
+
+python_bin="${PYTHON:-python}"
+
+if [[ "$clean" == true ]]; then
+  rm -rf "$dist_dir"
+fi
+
+(
+  cd "$cli_dir"
+  "$python_bin" -m build --wheel
+)
+
+mapfile -t wheels < <(find "$dist_dir" -maxdepth 1 -type f -name 'caelestia-*.whl' | sort)
+if [[ "${#wheels[@]}" -ne 1 ]]; then
+  echo "Expected exactly one caelestia wheel in $dist_dir, found ${#wheels[@]}." >&2
+  printf '  %s\n' "${wheels[@]}" >&2
+  exit 1
+fi
+
+uv tool install --force "${wheels[0]}"
+hash -r
+
+echo "Installed CLI: $(command -v caelestia)"
+caelestia scheme list --names >/dev/null
+
+if [[ "$restart_shell" == true ]]; then
+  "$repo_root/scripts/restart-shell"
+fi

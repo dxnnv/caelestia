@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if command -v systemctl >/dev/null && systemctl --user list-unit-files caelestia.service >/dev/null 2>&1; then
+  systemctl --user restart caelestia.service
+else
+  caelestia shell -k >/dev/null 2>&1 || true
+  caelestia shell -d
+fi
