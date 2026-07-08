@@ -14,7 +14,7 @@ end
 
 set -g repo_root (realpath (dirname (status current-filename))/..)
 set -g shell_dir "$repo_root/shell"
-set -g build_dir "$shell_dir/build"
+set -g build_dir "$shell_dir/build-lint"
 
 set -g only_check false
 set -g no_cpp false
@@ -22,7 +22,7 @@ set -g no_cpp false
 function check_qml
   cd "$shell_dir"; or return 1
   
-  for file in (string match -v "build/*" **.qml)
+  for file in (string match -rv "^build(-lint)?/" **.qml)
     /usr/lib/qt6/bin/qmlformat $file | diff -u $file - || return 1
   end
   
@@ -49,7 +49,7 @@ function lint_qml
   touch .qmlls.ini
 
   # Set environment
-  set -l qml_import_path "$PWD/build/qml:$HOME/.local/lib/qt6/qml:/usr/lib/qt6/qml"
+  set -l qml_import_path "$build_dir/qml:$HOME/.local/lib/qt6/qml:/usr/lib/qt6/qml"
 
   QML_DISABLE_DISK_CACHE=1 \
     QML_IMPORT_PATH="$qml_import_path" \
@@ -65,7 +65,7 @@ function lint_qml
   for path in $import_paths
     set -a args -I $path
   end
-  set -l qml_files (string match -vr '(build|modules/controlcenter)/.*' **.qml)
+  set -l qml_files (string match -vr '(build|build-lint|modules/controlcenter)/.*' **.qml)
 
   # Lint
   set -l lint_out (QML_DISABLE_DISK_CACHE=1 \
