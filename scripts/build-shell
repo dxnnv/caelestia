@@ -49,7 +49,8 @@ fi
 if [[ ! -f "$build_dir/build.ninja" ]]; then
   cmake -S "$shell_dir" -B "$build_dir" -G Ninja \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+    -DCMAKE_INSTALL_PREFIX=/
 fi
 
 cmake --build "$build_dir" -j"$(nproc)" "${build_args[@]}"
