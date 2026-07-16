@@ -1,0 +1,366 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+repo_root="$(cd "$script_dir/.." && pwd)"
+
+config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+state_home="${XDG_STATE_HOME:-$HOME/.local/state}"
+runtime_dir="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+env_file="${CAELESTIA_SHELLCTL_ENV:-$config_home/caelestia/shellctl.env}"
+
+# shellcheck disable=SC1090
+if [[ -r "$env_file" ]]; then
+  source "$env_file"
+fi
+
+: "${CAELESTIA_COMMAND:=caelestia}"
+: "${CAELESTIA_STOP_TIMEOUT:=5}"
+: "${CAELESTIA_START_TIMEOUT:=10}"
+: "${CAELESTIA_LOG_DIR:=$state_home/caelestia/logs}"
+: "${CAELESTIA_LOG_RETENTION_DAYS:=3}"
+: "${CAELESTIA_LIFECYCLE_TAG:=caelestia}"
+: "${CAELESTIA_QML_IMPORT_PATH:=$repo_root/shell/build/qml:$HOME/.local/lib/qt6/qml:/usr/lib/qt6/qml}"
+: "${CAELESTIA_QT_PLUGIN_PATH:=/usr/lib/qt6/plugins}"
+: "${CAELESTIA_QML_DISABLE_DISK_CACHE:=1}"
+
+acquire_lock() {
+  command -v flock >/dev/null 2>&1 || return 0
+  install -d -m 700 "$runtime_dir/caelestia-shell"
+  exec 9>"$runtime_dir/caelestia-shell/shellctl.lock"
+  flock -w 10 9 || die "another shellctl operation is still running"
+}
+
+usage() {
+  cat <<EOF
+usage: ${0##*/} [-h] COMMAND ...
+
+options:
+  -h, --help                   Show this help message and exit
+
+subcommands:
+  valid subcommands
+
+  COMMAND                      The cubscommand to run
+    start                      Start the shell detached
+    stop                       Kill the shell and archive the completed run log
+    restart                    Restart the shell
+    status                     Show the current Quickshell instance
+    list-logs                  List live/dead Quickshell instances and archived logs
+    logs [OPTIONS] [ID|FILE]   Print the shell log or an archived .qslog file
+
+Log options:
+  -f, --follow                 Keep reading the log until the logging process terminates
+  -t|-T, --(no-)log-times      Enable/disable log timestamps (defaults to enabled)
+
+Environment:
+
+  Optional environment file:
+    $env_file
+
+  Supported overrides:
+    CAELESTIA_COMMAND
+    CAELESTIA_STOP_TIMEOUT
+    CAELESTIA_START_TIMEOUT
+    CAELESTIA_LOG_DIR
+    CAELESTIA_LOG_RETENTION_DAYS
+    CAELESTIA_LIFECYCLE_TAG
+    CAELESTIA_GITHUB_USERNAME
+    CAELESTIA_QML_IMPORT_PATH
+    CAELESTIA_QT_PLUGIN_PATH
+    CAELESTIA_QML_DISABLE_DISK_CACHE
+EOF
+}
+
+die() {
+  printf '[%s] Error: %s\n' "${0##*/}" "$*" >&2
+  exit 1
+}
+
+lifecycle_log() {
+  local message=$1
+
+  printf '%s\n' "$message"
+  if command -v systemd-cat >/dev/null 2>&1; then
+    systemd-cat --identifier="$CAELESTIA_LIFECYCLE_TAG" --priority=info echo "$message" 2>/dev/null || true
+  elif command -v logger >/dev/null 2>&1; then
+    logger --tag "$CAELESTIA_LIFECYCLE_TAG" -- "$message" 2>/dev/null || true
+  fi
+}
+
+instance_json() {
+  qs list -c caelestia --json --any-display 2>/dev/null || printf '[]\n'
+}
+
+instance_ids() {
+  instance_json | awk -F '"' '/"id":/ { print $4 }'
+}
+
+is_running() {
+  instance_json | grep -q '"pid"'
+}
+
+wait_for_state() {
+  local wanted=$1
+  local timeout=$2
+  local iterations
+
+  [[ "$timeout" =~ ^[0-9]+$ ]] || die "timeout must be a non-negative integer: $timeout"
+  iterations=$((timeout * 10))
+
+  for ((i = 0; i <= iterations; i++)); do
+    if [[ "$wanted" == running ]] && is_running; then
+      return 0
+    fi
+    if [[ "$wanted" == stopped ]] && ! is_running; then
+      return 0
+    fi
+    sleep 0.1
+  done
+
+  return 1
+}
+
+prepare_environment() {
+  export QML_DISABLE_DISK_CACHE="$CAELESTIA_QML_DISABLE_DISK_CACHE"
+  export QML_IMPORT_PATH="$CAELESTIA_QML_IMPORT_PATH"
+  export QML2_IMPORT_PATH="$CAELESTIA_QML_IMPORT_PATH"
+  export QT_PLUGIN_PATH="$CAELESTIA_QT_PLUGIN_PATH"
+
+  if [[ -n "${CAELESTIA_GITHUB_USERNAME:-}" ]]; then
+    export GITHUB_USERNAME="$CAELESTIA_GITHUB_USERNAME"
+  else
+    unset GITHUB_USERNAME
+  fi
+}
+
+prune_logs() {
+  [[ "$CAELESTIA_LOG_RETENTION_DAYS" =~ ^[0-9]+$ ]] \
+    || die "CAELESTIA_LOG_RETENTION_DAYS must be a non-negative integer"
+
+  [[ -d "$CAELESTIA_LOG_DIR" ]] || return 0
+  find "$CAELESTIA_LOG_DIR" -type f -name '*.qslog' -mtime "+$CAELESTIA_LOG_RETENTION_DAYS" -delete
+}
+
+archive_log() {
+  local id=$1
+  local source="$runtime_dir/quickshell/by-id/$id/log.qslog"
+  local destination
+
+  [[ -r "$source" ]] || return 0
+  install -d -m 700 "$CAELESTIA_LOG_DIR"
+  destination="$CAELESTIA_LOG_DIR/$(date '+%Y%m%d-%H%M%S')-$id.qslog"
+  cp --reflink=auto -- "$source" "$destination"
+  printf 'Archived log: %s\n' "$destination"
+}
+
+format_log_times() {
+  LC_ALL=C gawk '
+    {
+      # Match ANSI color sequence before timestamps
+      pattern = "^(\033\\[[0-9;]*m)?" \
+                "([0-9]{4}-[0-9]{2}-[0-9]{2} " \
+                "[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3})"
+
+      if (match($0, pattern, parts)) {
+        ansi_prefix = parts[1]
+        raw_time = parts[2]
+
+        time_spec = substr(raw_time, 1, 4)  " " \
+                    substr(raw_time, 6, 2)  " " \
+                    substr(raw_time, 9, 2)  " " \
+                    substr(raw_time, 12, 2) " " \
+                    substr(raw_time, 15, 2) " " \
+                    substr(raw_time, 18, 2) " -1"
+
+        timestamp = mktime(time_spec)
+
+        if (timestamp != -1) {
+          rest = substr($0, RLENGTH + 1)
+
+          # Only check the visible characters (exclude leading ANSI)
+          visible_rest = rest
+          gsub(/^\033\[[0-9;]*m/, "", visible_rest)
+
+          # Append separator after the timestamp for bare Quickshell messages
+          separator = visible_rest ~ /^[[:space:]]/ ? "" : " "
+          reset = ansi_prefix != "" ? "\033[0m" : ""
+          
+          $0 = ansi_prefix \
+               strftime("%b %e %H:%M:%S", timestamp) \
+               reset \
+               separator \
+               rest
+        }
+      }
+
+      print
+      fflush()
+    }
+  '
+}
+
+start_shell() {
+  if is_running; then
+    printf 'Caelestia is already running.\n'
+    return 0
+  fi
+
+  prepare_environment
+  lifecycle_log "Starting Caelestia..."
+  if ! "$CAELESTIA_COMMAND" shell -d; then
+    lifecycle_log "QuickShell failed to launch."
+    return 1
+  fi
+
+  if ! wait_for_state running "$CAELESTIA_START_TIMEOUT"; then
+    lifecycle_log "QuickShell failed to start."
+    return 1
+  fi
+
+  lifecycle_log "Started Caelestia."
+}
+
+stop_shell() {
+  local ids=()
+
+  if ! is_running; then
+    printf 'Caelestia is not running.\n'
+    prune_logs
+    return 0
+  fi
+
+  mapfile -t ids < <(instance_ids)
+  lifecycle_log "Stopping Caelestia..."
+  "$CAELESTIA_COMMAND" shell -k >/dev/null 2>&1 || qs -c caelestia kill >/dev/null 2>&1 || true
+
+  if ! wait_for_state stopped "$CAELESTIA_STOP_TIMEOUT"; then
+    lifecycle_log "Quickshell did not stop within ${CAELESTIA_STOP_TIMEOUT}s."
+    return 1
+  fi
+
+  lifecycle_log "Stopped Caelestia."
+  for id in "${ids[@]}"; do
+    archive_log "$id"
+  done
+  prune_logs
+}
+
+status_shell() {
+  if ! is_running; then
+    printf 'Caelestia is not running.\n'
+    return 3
+  fi
+  qs list -c caelestia --any-display
+}
+
+list_logs() {
+  printf '%s\n' 'Quickshell instances:'
+  qs list -c caelestia --show-dead --any-display || true
+  printf '\n%s\n' "Archived logs in $CAELESTIA_LOG_DIR:"
+  if [[ -d "$CAELESTIA_LOG_DIR" ]]; then
+    find "$CAELESTIA_LOG_DIR" -maxdepth 1 -type f -name '*.qslog' -printf '%TY-%Tm-%Td %TH:%TM  %p\n' | sort -r
+  else
+    printf '%s\n' '(none)'
+  fi
+}
+
+show_log() {
+  local target=
+  local follow=0
+  local log_times=1
+  local qs_cmd=(qs log)
+  local qs_args=()
+
+  while (($#)); do
+    case "$1" in
+      -f|--follow)
+        follow=1
+        ;;
+      -t|--log-times)
+        log_times=1
+        ;;
+      -T|--no-log-times)
+        log_times=0
+        ;;
+      -h|--help)
+        usage
+        return 0
+        ;;
+      --)
+        shift
+        if (($# >1)); then
+          die "logs accepts at most one ID or FILE"
+        fi
+        target=${1:-}
+        break
+        ;;
+      -*)
+        die "unknown logs option: $1"
+        ;;
+      *)
+        if [[ -n "$target" ]]; then
+          die "logs accepts at most one ID or FILE"
+        fi
+        target=$1
+        ;;
+    esac
+    shift
+  done
+
+  if ((follow)); then
+    qs_args+=(--follow)
+  fi
+
+  if [[ -z "$target" ]]; then
+    qs_cmd+=(-c caelestia)
+  else
+    if [[ ! -f "$target" ]]; then
+      qs_cmd+=(--id)
+    fi
+    qs_cmd+=("$target")
+  fi
+
+  if ((log_times)); then
+    qs_args+=(--log-times)
+    
+    # The empty NO_COLOR overrides the inherited non-empty value
+    NO_COLOR= "${qs_cmd[@]}" "${qs_args[@]}" | format_log_times
+  else
+    "${qs_cmd[@]}" "${qs_args[@]}"
+  fi
+}
+
+case "${1:-}" in
+  start)
+    acquire_lock
+    start_shell
+    ;;
+  stop)
+    acquire_lock
+    stop_shell
+    ;;
+  restart)
+    acquire_lock
+    stop_shell
+    start_shell
+    ;;
+  status)
+    status_shell
+    ;;
+  list-logs)
+    list_logs
+    ;;
+  logs)
+    shift
+    show_log "$@"
+    ;;
+  -h|--help|help)
+    usage
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac

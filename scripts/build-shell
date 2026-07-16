@@ -39,7 +39,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$clean" == true ]]; then
-  systemctl --user stop caelestia.service 2>/dev/null || true
+  caelestia-shellctl stop
   if [[ -d "$build_dir" && ! -O "$build_dir" ]]; then
     sudo chown -R "$USER:$USER" "$build_dir"
   fi
