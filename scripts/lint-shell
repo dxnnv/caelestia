@@ -7,17 +7,51 @@ function usage
     'Run the shell formatting and lint checks.' \
     '' \
     'Options:' \
-    '  --only-check    Only run checks; do not build or lint QML' \
-    '  --no-cpp        Do not audit C++ files' \
-    '  -h, --help      Show this help'
+    '  -s, --shell-dir DIR  Shell checkout to lint (default: shell)' \
+    '  --only-check         Only run checks; do not build or lint QML' \
+    '  --no-cpp             Do not audit C++ files' \
+    '  -h, --help           Show this help'
 end
 
 set -g repo_root (realpath (dirname (status current-filename))/..)
 set -g shell_dir "$repo_root/shell"
-set -g build_dir "$shell_dir/build-lint"
 
 set -g only_check false
 set -g no_cpp false
+
+if not argparse -n lint-any-shell -X 0 \
+    's/shell-dir=' \
+    'only-check' \
+    'no-cpp' \
+    'h/help' \
+    -- $argv
+  usage >&2
+  exit 2
+end
+
+if set -q _flag_help
+  usage
+  exit 0
+end
+
+if set -q _flag_shell_dir
+  if not test -d "$_flag_shell_dir"
+    echo "Shell directory does not exist: $_flag_shell_dir" >&2
+    exit 2
+  end
+
+  set -g shell_dir (realpath "$_flag_shell_dir")
+end
+
+if not test -f "$shell_dir/CMakeLists.txt"; or not test -f "$shell_dir/scripts/qml-lint-conventions.py"
+  echo "Not a Caelestia shell checkout: $shell_dir" >&2
+  exit 2
+end
+
+set -g build_dir "$shell_dir/build-lint"
+
+set -q _flag_only_check; and set -g only_check true
+set -q _flag_no_cpp; and set -g no_cpp true
 
 function check_qml
   cd "$shell_dir"; or return 1
@@ -74,22 +108,6 @@ function lint_qml
     QT_PLUGIN_PATH="/usr/lib/qt6/plugins" \
     /usr/lib/qt6/bin/qmllint --bare --import disable $args $qml_files 2>&1 | tee /dev/stderr)
   test -z "$lint_out" || return 1
-end
-
-for arg in $argv
-  switch $arg
-    case --only-check
-      set only_check true
-    case --no-cpp
-      set no_cpp true
-    case -h --help
-      usage
-      exit 0
-    case '*'
-      echo "Unknown option: $arg" >&2
-      usage >&2
-      exit 2
-  end
 end
 
 check_qml; or exit 1
