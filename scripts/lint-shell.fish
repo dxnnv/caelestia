@@ -2,7 +2,7 @@
 
 function usage
   printf '%s\n' \
-    'Usage: scripts/lint-shell [OPTIONS]' \
+    'Usage: scripts/lint-shell.fish [OPTIONS]' \
     '' \
     'Run the shell formatting and lint checks.' \
     '' \
