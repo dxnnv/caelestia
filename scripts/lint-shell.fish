@@ -8,7 +8,7 @@ function usage
     '' \
     'Options:' \
     '  -s, --shell-dir DIR  Shell checkout to lint (default: shell)' \
-    '  --only-check         Only run checks; do not build or lint QML' \
+    '  --only-check         Skip the clazy build and qmllint' \
     '  --no-cpp             Do not audit C++ files' \
     '  -h, --help           Show this help'
 end
@@ -48,7 +48,15 @@ if not test -f "$shell_dir/CMakeLists.txt"; or not test -f "$shell_dir/scripts/q
   exit 2
 end
 
-set -g build_dir "$shell_dir/build-lint"
+# Keep each checkout's lint cache outside its source tree, identified by its name + shortened hash
+set -l build_root (realpath "$repo_root/..")/.build/lint-shell
+set -l checkout_name (basename "$shell_dir")
+set -l checkout_hash (printf '%s' "$shell_dir" | sha256sum)
+set checkout_hash (string sub --length 12 "$checkout_hash")
+
+set -l build_dir "$build_root/checkouts/$checkout_name-$checkout_hash"
+set -g qml_build_dir "$build_dir/qml"
+set -g cpp_build_dir "$build_dir/cpp"
 
 set -q _flag_only_check; and set -g only_check true
 set -q _flag_no_cpp; and set -g no_cpp true
@@ -70,12 +78,6 @@ function check_cpp
     | xargs clang-format --dry-run --Werror
 end
 
-function build
-  # Set version and git rev for CI build so we don't call git
-  cmake -S "$shell_dir" -B "$build_dir" -G Ninja -DCMAKE_CXX_COMPILER=clazy -DCMAKE_CXX_FLAGS=-Werror -DVERSION= -DGIT_REVISION=; or return 1
-  cmake --build "$build_dir" -j "$(nproc)"; or return 1 
-end
-
 function lint_qml
   cd "$shell_dir"; or return 1
 
@@ -83,7 +85,7 @@ function lint_qml
   touch .qmlls.ini
 
   # Set environment
-  set -l qml_import_path "$build_dir/qml:$HOME/.local/lib/qt6/qml:/usr/lib/qt6/qml"
+  set -l qml_import_path "$qml_build_dir/qml:$HOME/.local/lib/qt6/qml:/usr/lib/qt6/qml"
 
   QML_DISABLE_DISK_CACHE=1 \
     QML_IMPORT_PATH="$qml_import_path" \
@@ -110,10 +112,34 @@ function lint_qml
   test -z "$lint_out" || return 1
 end
 
+function lint_cpp
+  # Older shell checkouts predate the addition of .clang-tidy
+  test -f "$shell_dir/.clang-tidy"; or return 0
+
+  cmake -S "$shell_dir" -B "$cpp_build_dir" -G Ninja \
+    -DCMAKE_CXX_COMPILER=clang++ \
+    -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+    -DCMAKE_DISABLE_PRECOMPILE_HEADERS=ON \
+    -DVERSION= -DGIT_REVISION=; or return 1
+    
+    # Restrict the external compilation DB to this checkout's source
+    set -l source_root (string escape --style=regex "$shell_dir")
+    set -l source_filter "^$source_root/.*\\.cpp\$"
+    run-clang-tidy -p "$cpp_build_dir" -quiet -j "$(nproc)" \
+      -warnings-as-errors='*' -source-filter="$source_filter"; or return 1
+end
+
+function build
+  # Set version and git rev for CI build so we don't call git.
+  cmake -S "$shell_dir" -B "$qml_build_dir" -G Ninja -DCMAKE_CXX_COMPILER=clazy -DCMAKE_CXX_FLAGS=-Werror -DVERSION= -DGIT_REVISION=; or return 1
+  cmake --build "$qml_build_dir" -j "$(nproc)"; or return 1 
+end
+
 check_qml; or exit 1
 
 if test $no_cpp = false
   check_cpp; or exit 1
+  lint_cpp; or exit 1
 end
 
 if test $only_check = false
