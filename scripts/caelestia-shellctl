@@ -34,25 +34,23 @@ acquire_lock() {
 
 usage() {
   cat <<EOF
-usage: ${0##*/} [-h] COMMAND ...
+Usage: ${0##*/} [-h] COMMAND ...
 
-options:
-  -h, --help                   Show this help message and exit
+Options:
+  -h, --help                       Show this help message and exit
 
-subcommands:
-  valid subcommands
-
-  COMMAND                      The cubscommand to run
-    start                      Start the shell detached
-    stop                       Kill the shell and archive the completed run log
-    restart                    Restart the shell
-    status                     Show the current Quickshell instance
-    list-logs                  List live/dead Quickshell instances and archived logs
-    logs [OPTIONS] [ID|FILE]   Print the shell log or an archived .qslog file
+Subcommands:
+  COMMAND                          The subcommand to run
+    start                          Start the shell detached
+    stop                           Kill the shell and archive the completed run log
+    restart                        Restart the shell
+    status                         Show the current Quickshell instance
+    list-logs                      List live/dead Quickshell instances and archived logs
+    logs [OPTIONS] [--] [ID|FILE]  Print the shell log or an archived .qslog file
 
 Log options:
-  -f, --follow                 Keep reading the log until the logging process terminates
-  -t|-T, --(no-)log-times      Enable/disable log timestamps (defaults to enabled)
+  -f, --follow                     Keep reading the log until the logging process terminates
+  -t|-T, --(no-)log-times          Enable/disable log timestamps (defaults to enabled)
 
 Environment:
 
@@ -93,12 +91,25 @@ instance_json() {
   qs list -c caelestia --json --any-display 2>/dev/null || printf '[]\n'
 }
 
+instances() {
+  instance_json | gawk -v RS='}' '
+    match($0, /"id"[[:space:]]*:[[:space:]]*"([^"]+)"/, id) &&
+    match($0, /"pid"[[:space:]]*:[[:space:]]*([0-9]+)/, pid) {
+      print id[1] "\t" pid[1]
+    }
+  '
+}
+
 instance_ids() {
-  instance_json | awk -F '"' '/"id":/ { print $4 }'
+  instances | cut -f1
+}
+
+current_instance() {
+  instances | sed -n '1p'
 }
 
 is_running() {
-  instance_json | grep -q '"pid"'
+  [[ -n "$(current_instance)" ]]
 }
 
 wait_for_state() {
@@ -201,6 +212,103 @@ format_log_times() {
   '
 }
 
+format_plain_log() {
+  local log_times=$1
+
+  LC_ALL=C gawk -v show_times="$log_times" '
+    BEGIN {
+      reset = "\033[0m"
+      gray = "\033[90m"
+      white = "\033[97m"
+      blue = "\033[34m"
+      green = "\033[32m"
+      yellow = "\033[33m"
+      red = "\033[31m"
+    }
+
+    function level_colour(level) {
+      if (level == "DEBUG") return blue
+      if (level == "INFO") return green
+      if (level == "WARN") return yellow
+      return red
+    }
+
+    {
+      timestamp_pattern = "^([0-9]{4}-[0-9]{2}-[0-9]{2} " \
+                          "[0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3})"
+
+      if (!match($0, timestamp_pattern, timestamp_parts)) {
+        print
+        fflush()
+        next
+      }
+
+      raw_time = timestamp_parts[1]
+      rest = substr($0, RLENGTH + 1)
+      timestamp_prefix = ""
+
+      if (show_times) {
+        time_spec = substr(raw_time, 1, 4)  " " \
+                    substr(raw_time, 6, 2)  " " \
+                    substr(raw_time, 9, 2)  " " \
+                    substr(raw_time, 12, 2) " " \
+                    substr(raw_time, 15, 2) " " \
+                    substr(raw_time, 18, 2) " -1"
+
+        timestamp = mktime(time_spec)
+        if (timestamp != -1) {
+          timestamp_prefix = gray strftime("%b %e %H:%M:%S", timestamp)
+        } else {
+          timestamp_prefix = gray raw_time
+        }
+      }
+
+      message_pattern = "^([[:space:]]*)" \
+                        "(DEBUG|INFO|WARN|ERROR|FATAL)" \
+                        "([[:space:]][^:]*)?:(.*)$"
+
+      if (match(rest, message_pattern, message_parts)) {
+        indent = message_parts[1]
+        level = message_parts[2]
+        category = message_parts[3]
+        body = message_parts[4]
+        colour = level_colour(level)
+
+        if (level == "FATAL") {
+          $0 = timestamp_prefix colour indent level category ":" body reset
+        } else {
+          category_colour = category == "" ? "" : white
+          $0 = timestamp_prefix colour indent level \
+               category_colour category reset ":" body
+        }
+      } else if (show_times) {
+        separator = rest ~ /^[[:space:]]/ ? "" : " "
+        $0 = timestamp_prefix reset separator rest
+      } else {
+        $0 = rest
+      }
+
+      print
+      fflush()
+    }
+  '
+}
+
+follow_current_log() {
+  local log_times=$1
+  local instance id pid log_file
+
+  instance=$(current_instance)
+  [[ -n "$instance" ]] || die "Caelestia is not running."
+
+  IFS=$'\t' read -r id pid <<<"$instance"
+  log_file="$runtime_dir/quickshell/by-id/$id/log.log"
+
+  [[ -r "$log_file" ]] || die "live log is not readable: $log_file"
+
+  tail --pid="$pid" -n +1 -F -- "$log_file" | format_plain_log "$log_times"
+}
+
 start_shell() {
   if is_running; then
     printf 'Caelestia is already running.\n'
@@ -268,71 +376,120 @@ list_logs() {
 
 show_log() {
   local target=
+  local has_target=0
+  local parsing_options=1
   local follow=0
   local log_times=1
   local qs_cmd=(qs log)
   local qs_args=()
 
   while (($#)); do
-    case "$1" in
-      -f|--follow)
-        follow=1
-        ;;
-      -t|--log-times)
-        log_times=1
-        ;;
-      -T|--no-log-times)
-        log_times=0
-        ;;
-      -h|--help)
-        usage
-        return 0
-        ;;
-      --)
-        shift
-        if (($# >1)); then
-          die "logs accepts at most one ID or FILE"
-        fi
-        target=${1:-}
-        break
-        ;;
-      -*)
-        die "unknown logs option: $1"
-        ;;
-      *)
-        if [[ -n "$target" ]]; then
-          die "logs accepts at most one ID or FILE"
-        fi
-        target=$1
-        ;;
-    esac
+    if ((parsing_options)); then
+      case "$1" in
+        -f|--follow)
+          follow=1
+          shift
+          continue
+          ;;
+        -t|--log-times)
+          log_times=1
+          shift
+          continue
+          ;;
+        -T|--no-log-times)
+          log_times=0
+          shift
+          continue
+          ;;
+        --)
+          parsing_options=0
+          shift
+          continue
+          ;;
+        -*)
+          die "unknown logs option: $1"
+          ;;
+      esac
+    fi
+
+    ((has_target == 0)) || die "logs accepts at most one ID or FILE"
+    target=$1
+    has_target=1
     shift
   done
 
-  if ((follow)); then
-    qs_args+=(--follow)
+  if ((follow && !has_target)); then
+    follow_current_log "$log_times"
+    return
   fi
 
-  if [[ -z "$target" ]]; then
-    qs_cmd+=(-c caelestia)
-  else
-    if [[ ! -f "$target" ]]; then
-      qs_cmd+=(--id)
-    fi
-    qs_cmd+=("$target")
+  if ((follow)); then
+    qs_cmd+=(--follow)
   fi
 
   if ((log_times)); then
-    qs_args+=(--log-times)
-    
-    # The empty NO_COLOR overrides the inherited non-empty value
-    NO_COLOR= "${qs_cmd[@]}" "${qs_args[@]}" | format_log_times
+    qs_cmd+=(--log-times)
+  fi
+
+  if ((!has_target)); then
+    qs_cmd+=(-c caelestia)
+  elif [[ -f "$target" ]]; then
+    qs_cmd+=(-- "$target")
   else
-    "${qs_cmd[@]}" "${qs_args[@]}"
+    qs_cmd+=(--id "$target")
+  fi
+
+  if ((log_times)); then
+    # The empty NO_COLOR overrides the inherited non-empty value
+    NO_COLOR='' "${qs_cmd[@]}" | format_log_times
+  else
+    "${qs_cmd[@]}"
   fi
 }
 
-case "${1:-}" in
+help_requested() {
+  local arg
+
+  for arg in "$@"; do
+    case "$arg" in
+      -h|--help)
+        return 0
+        ;;
+      --)
+        return 1
+        ;;
+    esac
+  done
+
+  return 1
+}
+
+subcommand=${1:-}
+
+case "$subcommand" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  start|stop|restart|status|list-logs|logs)
+    shift
+    ;;
+  *)
+    usage >&2
+    exit 2
+    ;;
+esac
+
+if help_requested "$@"; then
+  usage
+  exit 0
+fi
+
+if [[ "$subcommand" != logs ]] && (($#)); then
+  die "$subcommand accepts no arguments"
+fi
+
+case "$subcommand" in
   start)
     acquire_lock
     start_shell
@@ -353,14 +510,6 @@ case "${1:-}" in
     list_logs
     ;;
   logs)
-    shift
     show_log "$@"
-    ;;
-  -h|--help|help)
-    usage
-    ;;
-  *)
-    usage >&2
-    exit 2
     ;;
 esac
